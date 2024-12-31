@@ -1,23 +1,10 @@
 use clap::Parser;
-use crossterm::event::{self, Event};
-use ratatui::{DefaultTerminal, Frame};
 
 use crate::cli::Opts;
+use crate::ui::run;
 
 pub mod cli;
-
-fn run(mut terminal: DefaultTerminal) -> eyre::Result<()> {
-    loop {
-        terminal.draw(render)?;
-        if matches!(event::read()?, Event::Key(_)) {
-            break Ok(());
-        }
-    }
-}
-
-fn render(frame: &mut Frame) {
-    frame.render_widget("hello world", frame.area());
-}
+pub mod ui;
 
 fn main() -> eyre::Result<()> {
     pretty_env_logger::init_timed();
