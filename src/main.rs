@@ -1,3 +1,9 @@
+use clap::Parser;
+
+use crate::cli::Opts;
+
+pub mod cli;
+
 fn main() {
-    println!("Hello, world!");
+    let _opts: Opts = Opts::parse();
 }
