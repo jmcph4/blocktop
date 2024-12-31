@@ -1,0 +1,62 @@
+name: Rust
+
+on: [push]
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v1
+
+            - name: Run build
+              run: cargo build --verbose
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v1
+
+            - name: Run tests
+              run: cargo test --verbose
+
+            - name: Generate documentation
+              run: cargo doc --verbose
+
+            - name: Run coverage
+              run: cargo install cargo-tarpaulin && cargo tarpaulin --avoid-cfg-tarpaulin # --fail-under 75
+
+    lint:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v1
+
+            - name: Run Rustfmt
+              run: cargo fmt -- --check
+            
+            - name: Run Clippy
+              run: cargo clippy --verbose
+
+            - name: Run Cargo check
+              run: cargo check --verbose
+    
+    benchmark:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v1
+
+            - name: Run benchmarks
+              run: cargo bench --verbose
+
+    audit:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v1
+
+            - name: Run dependency security audit
+              run: cargo --verbose audit
+
+            - name: Install cargo-outdated
+              run: cargo install cargo-outdated
+
+            - name: Run depedency version audit
+              run: cargo outdated --root-deps-only --verbose --exit-code 1
+
