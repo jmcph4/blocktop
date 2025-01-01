@@ -21,7 +21,7 @@ fn main() -> eyre::Result<()> {
     let _blockchain = BlockchainService::spawn(opts.rpc, db.clone());
 
     let terminal = ratatui::init();
-    let result = run(terminal);
+    let result = run(terminal, &db);
     ratatui::restore();
 
     result
