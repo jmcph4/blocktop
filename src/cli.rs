@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::Parser;
 use url::Url;
 
@@ -5,4 +7,6 @@ use url::Url;
 pub struct Opts {
     #[clap(short, long, default_value = "wss://eth.merkle.io")]
     pub rpc: Url,
+    #[clap(short, long)]
+    pub db: Option<PathBuf>,
 }
