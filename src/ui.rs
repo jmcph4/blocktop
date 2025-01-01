@@ -14,7 +14,7 @@ use ratatui::{
 
 use crate::db::Database;
 
-const TICK_MILLIS: u64 = 1_000; /* 1s */
+const TICK_MILLIS: u64 = 500; /* 500ms */
 
 /// Drives the TUI app
 pub fn run(mut terminal: DefaultTerminal, db: &Database) -> eyre::Result<()> {
