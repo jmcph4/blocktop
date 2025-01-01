@@ -1,12 +1,10 @@
-use std::{
-    rc::Rc,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use alloy::primitives::B256;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
+    style::Color,
     text::{Line, Span},
     widgets::{Block, List, ListItem, ListState},
     DefaultTerminal, Frame,
@@ -83,22 +81,20 @@ impl App {
     }
 
     pub fn draw(&mut self, frame: &mut Frame) {
-        let chunks =
-            Layout::vertical([Constraint::Length(3), Constraint::Min(0)])
-                .split(frame.area());
-        let block_hashes_box = Block::bordered().title("Latest blocks");
-        let app_box =
-            Block::bordered().title(Line::from(self.title.clone()).centered());
+        let chunks = Layout::horizontal([
+            Constraint::Percentage(50),
+            Constraint::Min(0),
+        ])
+        .split(frame.area());
+        let app_box = Block::bordered()
+            .title(Line::from(self.title.clone()).centered())
+            .border_style(Color::Green);
         frame.render_widget(app_box.clone(), frame.area());
-        frame.render_widget(block_hashes_box, app_box.inner(frame.area()));
-        self.draw_block_hashes_list(frame, chunks);
+        app_box.inner(chunks[0]);
+        self.draw_block_hashes_list(frame, chunks[0]);
     }
 
-    fn draw_block_hashes_list(
-        &mut self,
-        frame: &mut Frame,
-        chunks: Rc<[Rect]>,
-    ) {
+    fn draw_block_hashes_list(&mut self, frame: &mut Frame, area: Rect) {
         let block_hashes: Vec<ListItem> = self
             .block_hashes
             .items
@@ -109,10 +105,14 @@ impl App {
                 )])])
             })
             .collect();
-        let block_hashes_list = List::new(block_hashes);
+        let block_hashes_list = List::new(block_hashes).block(
+            Block::bordered()
+                .title(Line::from("Latest blocks").centered())
+                .border_style(Color::Green),
+        );
         frame.render_stateful_widget(
             block_hashes_list,
-            chunks[1],
+            area,
             &mut self.block_hashes.state,
         );
     }
