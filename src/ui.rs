@@ -4,7 +4,7 @@ use std::{
 };
 
 use alloy::primitives::B256;
-use crossterm::event::{self, Event};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     text::{Line, Span},
@@ -14,7 +14,7 @@ use ratatui::{
 
 use crate::db::Database;
 
-const TICK_MILLIS: u64 = 250; /* 250ms */
+const TICK_MILLIS: u64 = 1_000; /* 1s */
 
 /// Drives the TUI app
 pub fn run(mut terminal: DefaultTerminal, db: &Database) -> eyre::Result<()> {
@@ -25,13 +25,25 @@ pub fn run(mut terminal: DefaultTerminal, db: &Database) -> eyre::Result<()> {
     loop {
         terminal.draw(|frame| app.draw(frame))?;
 
+        let timeout = tick_rate.saturating_sub(last_tick.elapsed());
+        if event::poll(timeout)? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press {
+                    match key.code {
+                        KeyCode::Char(c) => app.on_key(c),
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        if app.should_quit {
+            return Ok(());
+        }
+
         if last_tick.elapsed() >= tick_rate {
             app.on_tick(db);
             last_tick = Instant::now();
-        }
-
-        if matches!(event::read()?, Event::Key(_)) {
-            break Ok(());
         }
     }
 }
@@ -63,7 +75,9 @@ impl App {
     pub fn on_tick(&mut self, db: &Database) {
         if let Ok(t) = db.latest_block_hash() {
             if let Some(hash) = t {
-                self.block_hashes.items.push(hash);
+                if !self.block_hashes.items.contains(&hash) {
+                    self.block_hashes.items.push(hash);
+                }
             }
         }
     }
