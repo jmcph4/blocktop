@@ -50,7 +50,7 @@ impl Database {
         match self.conn_pool.get()?.query_row(
             "SELECT hash FROM block_headers ORDER BY inserted_at DESC LIMIT 1",
             [],
-            |row| row.get::<usize, String>(1),
+            |row| row.get::<usize, String>(0),
         ) {
             Ok(t) => Ok(Some(t.parse()?)),
             Err(e) => match e {
@@ -62,7 +62,7 @@ impl Database {
 
     pub fn add_block_header(&self, header: &Header) -> eyre::Result<usize> {
         Ok(self.conn_pool.get()?.execute(
-            "INSERT INTO block_headers (inserted_at, hash) VALUES (now, ?1)",
+            "INSERT INTO block_headers (inserted_at, hash) VALUES (TIME('now'), ?1)",
             [header.hash.to_string()],
         )?)
     }
