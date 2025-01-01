@@ -1,7 +1,4 @@
-use std::{
-    io::Write,
-    thread::{self, JoinHandle},
-};
+use std::thread::{self, JoinHandle};
 
 use futures::StreamExt;
 use tokio::runtime::Builder;
@@ -35,15 +32,6 @@ impl BlockchainService {
                 while let Some(header) =
                     this.client.block_headers().await?.next().await
                 {
-                    std::fs::OpenOptions::new()
-                        .append(true)
-                        .create(true)
-                        .open("headers.txt")
-                        .unwrap()
-                        .write_all(
-                            format!("block: {}\n", header.hash).as_bytes(),
-                        )
-                        .unwrap();
                     db.add_block_header(&header)?;
                 }
                 Ok(this)
