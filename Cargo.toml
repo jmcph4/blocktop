@@ -4,10 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+alloy = { version = "0.9.1", features = ["provider-ws", "rpc-types-eth"] }
 clap = { version = "4.5.23", features = ["derive"] }
 crossterm = "0.28.1"
 eyre = "0.6.12"
+futures = "0.3.31"
 log = "0.4.22"
 pretty_env_logger = "0.5.0"
 ratatui = "0.29.0"
+tokio = { version = "1.42.0", features = ["rt-multi-thread"] }
 url = "2.5.4"
