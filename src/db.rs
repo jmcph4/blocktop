@@ -1,13 +1,13 @@
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use alloy::{
-    primitives::{BlockNumber, B256},
+    primitives::{BlockNumber, B256, U256},
     rpc::types::eth::Header,
 };
 use eyre::eyre;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::{params, Params};
+use rusqlite::{params, Params, Row};
 
 const CONN_GET_TIMEOUT_MILLIS: u64 = 1_000; /* 1 second */
 const CONN_IDLE_TIMEOUT_MILLIS: u64 = 1_000; /* 1 second */
@@ -59,6 +59,20 @@ impl Database {
             |row| row.get::<usize, String>(0),
         ) {
             Ok(t) => Ok(Some(t.parse()?)),
+            Err(e) => match e {
+                rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                _ => Err(eyre!(e)),
+            },
+        }
+    }
+
+    pub fn latest_block_header(&self) -> eyre::Result<Option<Header>> {
+        match self.conn_pool.get()?.query_row(
+            "SELECT * FROM block_headers ORDER BY inserted_at DESC LIMIT 1",
+            [],
+            |row| Ok(Self::row_to_header(row)),
+        ) {
+            Ok(t) => Ok(Some(t?)),
             Err(e) => match e {
                 rusqlite::Error::QueryReturnedNoRows => Ok(None),
                 _ => Err(eyre!(e)),
@@ -210,5 +224,52 @@ impl Database {
             .to_string(),
             (),
         )
+    }
+
+    fn row_to_header(row: &Row) -> eyre::Result<Header> {
+        Ok(Header::new(alloy::consensus::Header {
+            parent_hash: row.get::<usize, String>(3)?.parse()?,
+            ommers_hash: row.get::<usize, String>(4)?.parse()?,
+            beneficiary: row.get::<usize, String>(5)?.parse()?,
+            state_root: row.get::<usize, String>(6)?.parse()?,
+            transactions_root: row.get::<usize, String>(7)?.parse()?,
+            receipts_root: row.get::<usize, String>(8)?.parse()?,
+            logs_bloom: row.get::<usize, String>(9)?.parse()?,
+            difficulty: U256::from(row.get::<usize, u64>(10)?),
+            number: row.get::<usize, u64>(2)?,
+            gas_limit: row.get::<usize, u64>(11)?,
+            gas_used: row.get::<usize, u64>(12)?,
+            timestamp: row.get::<usize, u64>(13)?,
+            extra_data: row.get::<usize, String>(14)?.into(),
+            mix_hash: row.get::<usize, String>(15)?.parse()?,
+            nonce: row.get::<usize, String>(16)?.parse()?,
+            base_fee_per_gas: match row.get::<usize, u64>(17)? {
+                0 => None,
+                x => Some(x),
+            },
+            withdrawals_root: match row.get::<usize, String>(18)?.as_str() {
+                "" => None,
+                x => Some(x.parse()?),
+            },
+            blob_gas_used: match row.get::<usize, u64>(19)? {
+                0 => None,
+                x => Some(x),
+            },
+            excess_blob_gas: match row.get::<usize, u64>(20)? {
+                0 => None,
+                x => Some(x),
+            },
+            parent_beacon_block_root: match row
+                .get::<usize, String>(21)?
+                .as_str()
+            {
+                "" => None,
+                x => Some(x.parse()?),
+            },
+            requests_hash: match row.get::<usize, String>(22)?.as_str() {
+                "" => None,
+                x => Some(x.parse()?),
+            },
+        }))
     }
 }

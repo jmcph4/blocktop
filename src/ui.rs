@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use alloy::primitives::{BlockNumber, B256};
+use alloy::rpc::types::Header;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -49,8 +49,7 @@ pub fn run(mut terminal: DefaultTerminal, db: &Database) -> eyre::Result<()> {
 pub struct App {
     title: String,
     should_quit: bool,
-    block_hashes: StatefulList<B256>,
-    block_numbers: StatefulList<BlockNumber>,
+    block_headers: StatefulList<Header>,
 }
 
 impl App {
@@ -68,18 +67,10 @@ impl App {
     }
 
     pub fn on_tick(&mut self, db: &Database) {
-        if let Ok(t) = db.latest_block_hash() {
-            if let Some(hash) = t {
-                if !self.block_hashes.items.contains(&hash) {
-                    self.block_hashes.items.push(hash);
-                }
-            }
-        }
-
-        if let Ok(t) = db.latest_block_number() {
-            if let Some(num) = t {
-                if !self.block_numbers.items.contains(&num) {
-                    self.block_numbers.items.push(num);
+        if let Ok(t) = db.latest_block_header() {
+            if let Some(header) = t {
+                if !self.block_headers.items.contains(&header) {
+                    self.block_headers.items.push(header);
                 }
             }
         }
@@ -96,52 +87,29 @@ impl App {
             .border_style(Color::Green);
         frame.render_widget(app_box.clone(), frame.area());
         app_box.inner(chunks[0]);
-        self.draw_block_numbers_list(frame, chunks[0]);
+        self.draw_latest_blocks_list(frame, chunks[0]);
     }
 
-    fn draw_block_numbers_list(&mut self, frame: &mut Frame, area: Rect) {
-        let block_numbers: Vec<ListItem> = self
-            .block_numbers
+    fn draw_latest_blocks_list(&mut self, frame: &mut Frame, area: Rect) {
+        let block_headers: Vec<ListItem> = self
+            .block_headers
             .items
             .iter()
-            .map(|hash| {
+            .map(|header| {
                 ListItem::new(vec![Line::from(vec![Span::raw(
-                    hash.to_string(),
+                    header.number.to_string(),
                 )])])
             })
             .collect();
-        let block_numbers_list = List::new(block_numbers).block(
+        let latest_blocks_list = List::new(block_headers).block(
             Block::bordered()
                 .title(Line::from("Latest blocks").centered())
                 .border_style(Color::Green),
         );
         frame.render_stateful_widget(
-            block_numbers_list,
+            latest_blocks_list,
             area,
-            &mut self.block_numbers.state,
-        );
-    }
-
-    fn draw_block_hashes_list(&mut self, frame: &mut Frame, area: Rect) {
-        let block_hashes: Vec<ListItem> = self
-            .block_hashes
-            .items
-            .iter()
-            .map(|hash| {
-                ListItem::new(vec![Line::from(vec![Span::raw(
-                    hash.to_string(),
-                )])])
-            })
-            .collect();
-        let block_hashes_list = List::new(block_hashes).block(
-            Block::bordered()
-                .title(Line::from("Latest blocks").centered())
-                .border_style(Color::Green),
-        );
-        frame.render_stateful_widget(
-            block_hashes_list,
-            area,
-            &mut self.block_hashes.state,
+            &mut self.block_headers.state,
         );
     }
 }
