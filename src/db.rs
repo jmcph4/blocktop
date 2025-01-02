@@ -162,7 +162,7 @@ impl Database {
                 header.gas_limit.to_string(),
                 header.gas_used.to_string(),
                 header.timestamp.to_string(),
-                header.extra_data.to_string(),
+                header.extra_data.to_vec(),
                 header.mix_hash.to_string(),
                 header.nonce.to_string(),
                 header.base_fee_per_gas.unwrap_or_default(),
@@ -240,7 +240,7 @@ impl Database {
             gas_limit: row.get::<usize, u64>(11)?,
             gas_used: row.get::<usize, u64>(12)?,
             timestamp: row.get::<usize, u64>(13)?,
-            extra_data: row.get::<usize, String>(14)?.into(),
+            extra_data: row.get::<usize, Vec<u8>>(14)?.into(),
             mix_hash: row.get::<usize, String>(15)?.parse()?,
             nonce: row.get::<usize, String>(16)?.parse()?,
             base_fee_per_gas: match row.get::<usize, u64>(17)? {

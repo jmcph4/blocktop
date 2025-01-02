@@ -9,6 +9,7 @@ pub mod client;
 pub mod db;
 pub mod services;
 pub mod ui;
+pub mod utils;
 
 fn main() -> eyre::Result<()> {
     pretty_env_logger::init_timed();

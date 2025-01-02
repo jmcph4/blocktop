@@ -10,7 +10,7 @@ use ratatui::{
     DefaultTerminal, Frame,
 };
 
-use crate::db::Database;
+use crate::{db::Database, utils::BuilderIdentity};
 
 const TICK_MILLIS: u64 = 500; /* 500ms */
 
@@ -96,9 +96,14 @@ impl App {
             .items
             .iter()
             .map(|header| {
-                ListItem::new(vec![Line::from(vec![Span::raw(
-                    header.number.to_string(),
-                )])])
+                ListItem::new(vec![Line::from(vec![
+                    Span::raw(header.number.to_string()),
+                    Span::styled(
+                        BuilderIdentity::from(header.extra_data.clone())
+                            .to_string(),
+                        Color::Green,
+                    ),
+                ])])
             })
             .collect();
         let latest_blocks_list = List::new(block_headers).block(
