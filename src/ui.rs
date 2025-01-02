@@ -27,9 +27,8 @@ pub fn run(mut terminal: DefaultTerminal, db: &Database) -> eyre::Result<()> {
         if event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char(c) => app.on_key(c),
-                        _ => {}
+                    if let KeyCode::Char(c) = key.code {
+                        app.on_key(c)
                     }
                 }
             }
@@ -63,11 +62,8 @@ impl App {
     }
 
     pub fn on_key(&mut self, c: char) {
-        match c {
-            'q' => {
-                self.should_quit = true;
-            }
-            _ => {}
+        if c == 'q' {
+            self.should_quit = true;
         }
     }
 
