@@ -1,6 +1,9 @@
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
-use alloy::{primitives::B256, rpc::types::eth::Header};
+use alloy::{
+    primitives::{BlockNumber, B256},
+    rpc::types::eth::Header,
+};
 use eyre::eyre;
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
@@ -60,10 +63,24 @@ impl Database {
         }
     }
 
+    pub fn latest_block_number(&self) -> eyre::Result<Option<BlockNumber>> {
+        match self.conn_pool.get()?.query_row(
+            "SELECT number FROM block_headers ORDER BY inserted_at DESC LIMIT 1",
+            [],
+            |row| row.get::<usize, u64>(0),
+        ) {
+            Ok(t) => Ok(Some(t)),
+            Err(e) => match e {
+                rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                _ => Err(eyre!(e)),
+            },
+        }
+    }
+
     pub fn add_block_header(&self, header: &Header) -> eyre::Result<usize> {
         Ok(self.conn_pool.get()?.execute(
-            "INSERT INTO block_headers (inserted_at, hash) VALUES (TIME('now'), ?1)",
-            [header.hash.to_string()],
+            "INSERT INTO block_headers (inserted_at, hash, number) VALUES (TIME('now'), ?1, ?2)",
+            [header.hash.to_string(), header.number.to_string()],
         )?)
     }
 }

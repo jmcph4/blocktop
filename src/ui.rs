@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use alloy::primitives::B256;
+use alloy::primitives::{BlockNumber, B256};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -51,6 +51,7 @@ pub struct App {
     title: String,
     should_quit: bool,
     block_hashes: StatefulList<B256>,
+    block_numbers: StatefulList<BlockNumber>,
 }
 
 impl App {
@@ -78,6 +79,14 @@ impl App {
                 }
             }
         }
+
+        if let Ok(t) = db.latest_block_number() {
+            if let Some(num) = t {
+                if !self.block_numbers.items.contains(&num) {
+                    self.block_numbers.items.push(num);
+                }
+            }
+        }
     }
 
     pub fn draw(&mut self, frame: &mut Frame) {
@@ -91,7 +100,30 @@ impl App {
             .border_style(Color::Green);
         frame.render_widget(app_box.clone(), frame.area());
         app_box.inner(chunks[0]);
-        self.draw_block_hashes_list(frame, chunks[0]);
+        self.draw_block_numbers_list(frame, chunks[0]);
+    }
+
+    fn draw_block_numbers_list(&mut self, frame: &mut Frame, area: Rect) {
+        let block_numbers: Vec<ListItem> = self
+            .block_numbers
+            .items
+            .iter()
+            .map(|hash| {
+                ListItem::new(vec![Line::from(vec![Span::raw(
+                    hash.to_string(),
+                )])])
+            })
+            .collect();
+        let block_numbers_list = List::new(block_numbers).block(
+            Block::bordered()
+                .title(Line::from("Latest blocks").centered())
+                .border_style(Color::Green),
+        );
+        frame.render_stateful_widget(
+            block_numbers_list,
+            area,
+            &mut self.block_numbers.state,
+        );
     }
 
     fn draw_block_hashes_list(&mut self, frame: &mut Frame, area: Rect) {
