@@ -4,7 +4,7 @@ use alloy::rpc::types::Header;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    style::Color,
+    style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, List, ListItem, ListState},
     DefaultTerminal, Frame,
@@ -78,7 +78,7 @@ impl App {
 
     pub fn draw(&mut self, frame: &mut Frame) {
         let chunks = Layout::horizontal([
-            Constraint::Percentage(50),
+            Constraint::Percentage(25),
             Constraint::Min(0),
         ])
         .split(frame.area());
@@ -97,11 +97,11 @@ impl App {
             .iter()
             .map(|header| {
                 ListItem::new(vec![Line::from(vec![
-                    Span::raw(header.number.to_string()),
+                    Span::raw(format!("{:<16}", header.number.to_string())),
                     Span::styled(
                         BuilderIdentity::from(header.extra_data.clone())
                             .to_string(),
-                        Color::Green,
+                        Style::new().bold(),
                     ),
                 ])])
             })
