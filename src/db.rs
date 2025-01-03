@@ -119,8 +119,7 @@ impl Database {
                     blob_gas_used,
                     excess_blob_gas,
                     parent_beacon_block_root,
-                    requests_hash,
-                    size
+                    requests_hash
                 ) VALUES (
                     TIME('now'),
                     ?1,
@@ -144,8 +143,7 @@ impl Database {
                     ?19,
                     ?20,
                     ?21,
-                    ?22,
-                    ?23
+                    ?22
                 )"
             .to_string(),
             params![
@@ -174,7 +172,6 @@ impl Database {
                     .unwrap_or_default()
                     .to_string(),
                 header.requests_hash.unwrap_or_default().to_string(),
-                header.size.unwrap_or_default().to_string(),
             ],
         )
     }
@@ -218,8 +215,7 @@ impl Database {
             blob_gas_used INTEGER,
             excess_blob_gas INTEGER,
             parent_beacon_block_root STRING,
-            requests_hash INTEGER,
-            size INTEGER
+            requests_hash INTEGER
         )"
             .to_string(),
             (),
