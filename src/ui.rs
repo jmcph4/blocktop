@@ -67,11 +67,9 @@ impl App {
     }
 
     pub fn on_tick(&mut self, db: &Database) {
-        if let Ok(t) = db.latest_block_header() {
-            if let Some(header) = t {
-                if !self.block_headers.items.contains(&header) {
-                    self.block_headers.items.push(header);
-                }
+        if let Ok(Some(header)) = db.latest_block_header() {
+            if !self.block_headers.items.contains(&header) {
+                self.block_headers.items.push(header);
             }
         }
     }
