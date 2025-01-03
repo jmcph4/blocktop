@@ -1,6 +1,7 @@
 use std::time::{Duration, Instant};
 
 use alloy::rpc::types::Header;
+use chrono::{TimeZone, Utc};
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -75,17 +76,15 @@ impl App {
     }
 
     pub fn draw(&mut self, frame: &mut Frame) {
-        let chunks = Layout::horizontal([
-            Constraint::Percentage(25),
-            Constraint::Min(0),
-        ])
-        .split(frame.area());
+        let chunks =
+            Layout::vertical([Constraint::Min(20), Constraint::Min(0)])
+                .split(frame.area());
         let app_box = Block::bordered()
             .title(Line::from(self.title.clone()).centered())
             .border_style(Color::Green);
         frame.render_widget(app_box.clone(), frame.area());
-        app_box.inner(chunks[0]);
-        self.draw_latest_blocks_list(frame, chunks[0]);
+        app_box.inner(chunks[1]);
+        self.draw_latest_blocks_list(frame, chunks[1]);
     }
 
     fn draw_latest_blocks_list(&mut self, frame: &mut Frame, area: Rect) {
@@ -95,11 +94,34 @@ impl App {
             .iter()
             .map(|header| {
                 ListItem::new(vec![Line::from(vec![
-                    Span::raw(format!("{:<16}", header.number.to_string())),
                     Span::styled(
-                        BuilderIdentity::from(header.extra_data.clone())
-                            .to_string(),
+                        format!("{:<20}", header.number.to_string()),
                         Style::new().bold(),
+                    ),
+                    Span::raw(format!(
+                        "{:<20}",
+                        format!(
+                            "{:.3} gwei",
+                            header.base_fee_per_gas.unwrap_or_default() as f64
+                                / f64::powi(10.0, 9)
+                        )
+                    )),
+                    Span::raw(format!("{:<20}", header.gas_used)),
+                    Span::raw(format!("{:<20}", header.gas_limit)),
+                    Span::styled(
+                        format!(
+                            "{:<20}",
+                            Utc.timestamp_opt(header.timestamp as i64, 0)
+                                .unwrap()
+                        ),
+                        Style::new().underlined(),
+                    ),
+                    Span::styled(
+                        format!(
+                            "    {:<20}",
+                            BuilderIdentity::from(header.extra_data.clone())
+                        ),
+                        Style::new().italic(),
                     ),
                 ])])
             })
