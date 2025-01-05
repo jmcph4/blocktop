@@ -2,6 +2,7 @@
 use std::sync::Arc;
 
 use alloy::{
+    primitives::ChainId,
     providers::{Provider, ProviderBuilder, RootProvider, WsConnect},
     pubsub::PubSubFrontend,
     rpc::types::{Block, Header, Transaction},
@@ -11,6 +12,7 @@ use url::Url;
 
 pub trait Client {
     fn url(&self) -> Url;
+    fn chain_id(&self) -> ChainId;
     async fn blocks(
         &self,
     ) -> eyre::Result<Box<dyn Stream<Item = Block> + Unpin>>;
@@ -25,16 +27,22 @@ pub trait Client {
 #[derive(Clone, Debug)]
 pub struct WsClient {
     url: Url,
+    chain_id: ChainId,
     provider: Arc<RootProvider<PubSubFrontend>>,
 }
 
 impl WsClient {
     pub async fn new(url: Url) -> eyre::Result<Self> {
+        let provider = Arc::new(
+            ProviderBuilder::new()
+                .on_ws(WsConnect::new(url.clone()))
+                .await?,
+        );
+        let chain_id = provider.get_chain_id().await?;
         Ok(Self {
-            url: url.clone(),
-            provider: Arc::new(
-                ProviderBuilder::new().on_ws(WsConnect::new(url)).await?,
-            ),
+            url,
+            chain_id,
+            provider,
         })
     }
 
@@ -46,6 +54,10 @@ impl WsClient {
 impl Client for WsClient {
     fn url(&self) -> Url {
         self.url.clone()
+    }
+
+    fn chain_id(&self) -> ChainId {
+        self.chain_id
     }
 
     async fn blocks(
