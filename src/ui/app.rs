@@ -1,56 +1,22 @@
-use std::time::{Duration, Instant};
-
 use alloy::rpc::types::Header;
 use chrono::{TimeZone, Utc};
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, List, ListItem, ListState},
-    DefaultTerminal, Frame,
+    widgets::{Block, List, ListItem},
+    Frame,
 };
 
 use crate::{db::Database, utils::BuilderIdentity};
 
-const TICK_MILLIS: u64 = 500; /* 500ms */
-
-/// Drives the TUI app
-pub fn run(mut terminal: DefaultTerminal, db: &Database) -> eyre::Result<()> {
-    let mut app = App::new("blocktop".to_string());
-    let tick_rate: Duration = Duration::from_millis(TICK_MILLIS);
-    let mut last_tick = Instant::now();
-
-    loop {
-        terminal.draw(|frame| app.draw(frame))?;
-
-        let timeout = tick_rate.saturating_sub(last_tick.elapsed());
-        if event::poll(timeout)? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    if let KeyCode::Char(c) = key.code {
-                        app.on_key(c)
-                    }
-                }
-            }
-        }
-
-        if app.should_quit {
-            return Ok(());
-        }
-
-        if last_tick.elapsed() >= tick_rate {
-            app.on_tick(db);
-            last_tick = Instant::now();
-        }
-    }
-}
+use super::components::stateful_list::StatefulList;
 
 #[derive(Clone, Debug, Default)]
 pub struct App {
-    title: String,
-    should_quit: bool,
-    block_headers: StatefulList<Header>,
+    pub title: String,
+    pub should_quit: bool,
+    pub block_headers: StatefulList<Header>,
 }
 
 impl App {
@@ -136,48 +102,5 @@ impl App {
             area,
             &mut self.block_headers.state,
         );
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct StatefulList<T> {
-    pub state: ListState,
-    pub items: Vec<T>,
-}
-
-impl<T> StatefulList<T> {
-    pub fn with_items(items: Vec<T>) -> Self {
-        Self {
-            state: ListState::default(),
-            items,
-        }
-    }
-
-    pub fn next(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i >= self.items.len() - 1 {
-                    0
-                } else {
-                    i + 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
-    }
-
-    pub fn previous(&mut self) {
-        let i = match self.state.selected() {
-            Some(i) => {
-                if i == 0 {
-                    self.items.len() - 1
-                } else {
-                    i - 1
-                }
-            }
-            None => 0,
-        };
-        self.state.select(Some(i));
     }
 }
