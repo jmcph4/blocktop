@@ -9,4 +9,6 @@ pub struct Opts {
     pub rpc: Url,
     #[clap(short, long)]
     pub db: Option<PathBuf>,
+    #[clap(long, action)]
+    pub headless: bool,
 }

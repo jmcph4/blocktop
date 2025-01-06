@@ -967,6 +967,7 @@ dependencies = [
  "crossterm",
  "eyre",
  "futures",
+ "log",
  "pretty_env_logger",
  "r2d2",
  "r2d2_sqlite",

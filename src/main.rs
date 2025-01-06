@@ -19,11 +19,15 @@ fn main() -> eyre::Result<()> {
         Some(file) => Location::Disk(file),
         None => Location::Memory,
     })?;
-    let _blockchain = BlockchainService::spawn(opts.rpc, db.clone());
+    let blockchain = BlockchainService::spawn(opts.rpc, db.clone());
 
-    let terminal = ratatui::init();
-    let result = run(terminal, &db);
-    ratatui::restore();
-
-    result
+    if !opts.headless {
+        let terminal = ratatui::init();
+        let result = run(terminal, &db);
+        ratatui::restore();
+        result
+    } else {
+        let _ = blockchain.join();
+        Ok(())
+    }
 }

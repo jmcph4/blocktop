@@ -8,6 +8,7 @@ use alloy::{
     rpc::types::{Block, Header, Transaction},
 };
 use futures::Stream;
+use log::{debug, info};
 use url::Url;
 
 pub trait Client {
@@ -39,6 +40,10 @@ impl WsClient {
                 .await?,
         );
         let chain_id = provider.get_chain_id().await?;
+        info!(
+            "Client initialised (endpoint: {}, chain: {})",
+            url, chain_id
+        );
         Ok(Self {
             url,
             chain_id,
@@ -63,12 +68,14 @@ impl Client for WsClient {
     async fn blocks(
         &self,
     ) -> eyre::Result<Box<dyn Stream<Item = Block> + Unpin>> {
+        debug!("Subscribing to block stream...");
         todo!()
     }
 
     async fn block_headers(
         &self,
     ) -> eyre::Result<Box<dyn Stream<Item = Header> + Unpin>> {
+        debug!("Subscribing to block header stream...");
         Ok(Box::new(
             self.provider.subscribe_blocks().await?.into_stream(),
         ))
@@ -77,6 +84,7 @@ impl Client for WsClient {
     async fn pending_transactions(
         &self,
     ) -> eyre::Result<Box<dyn Stream<Item = Transaction> + Unpin>> {
+        debug!("Subscribing to pending transaction stream...");
         Ok(Box::new(
             self.provider
                 .subscribe_full_pending_transactions()
