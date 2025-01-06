@@ -1,6 +1,7 @@
 use std::thread::{self, JoinHandle};
 
 use futures::StreamExt;
+use log::debug;
 use tokio::runtime::Builder;
 use url::Url;
 
@@ -33,6 +34,7 @@ impl BlockchainService {
                     this.client.block_headers().await?.next().await
                 {
                     db.add_block_header(&header)?;
+                    debug!("Saved header: {}", &header.hash);
                 }
                 Ok(this)
             })
