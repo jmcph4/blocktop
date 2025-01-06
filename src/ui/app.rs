@@ -3,8 +3,9 @@ use chrono::{TimeZone, Utc};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
+    symbols,
     text::{Line, Span},
-    widgets::{Block, List, ListItem},
+    widgets::{Bar, BarChart, BarGroup, Block, List, ListItem},
     Frame,
 };
 
@@ -51,6 +52,7 @@ impl App {
         frame.render_widget(app_box.clone(), frame.area());
         app_box.inner(chunks[1]);
         self.draw_latest_blocks_list(frame, chunks[1]);
+        self.draw_gas_barchart(frame, chunks[0], app_box);
     }
 
     fn draw_latest_blocks_list(&mut self, frame: &mut Frame, area: Rect) {
@@ -102,5 +104,49 @@ impl App {
             area,
             &mut self.block_headers.state,
         );
+    }
+
+    fn draw_gas_barchart(
+        &mut self,
+        frame: &mut Frame,
+        area: Rect,
+        block: Block,
+    ) {
+        let barchart = BarChart::default()
+            .block(block)
+            .data(self.gas_bar_group())
+            .bar_width(8)
+            .bar_gap(8)
+            .bar_set(symbols::bar::NINE_LEVELS)
+            .value_style(
+                Style::default().fg(Color::Black).bg(Color::Green).italic(),
+            )
+            .label_style(Style::default().fg(Color::Yellow))
+            .bar_style(Style::default().fg(Color::Green));
+        frame.render_widget(barchart, area);
+    }
+
+    fn chart_data(&self) -> Vec<(String, u64)> {
+        self.block_headers
+            .items
+            .iter()
+            .map(|header| (header.number.to_string(), header.gas_used))
+            .collect()
+    }
+
+    fn gas_bar_group(&self) -> BarGroup<'_> {
+        let mut xs = BarGroup::default();
+        let bars: Vec<Bar<'_>> = self
+            .chart_data()
+            .iter()
+            .map(|(k, v)| {
+                Bar::default()
+                    .label(Line::from(k.clone()))
+                    .value(*v)
+                    .text_value(String::new())
+            })
+            .collect();
+        xs = xs.clone().bars(&bars[..]);
+        xs.clone()
     }
 }
