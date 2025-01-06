@@ -5,7 +5,7 @@ use tokio::runtime::Builder;
 use url::Url;
 
 use crate::{
-    client::{Client, WsClient},
+    client::{AnyClient, Client},
     db::Database,
 };
 
@@ -13,7 +13,7 @@ const NUM_WORKERS: usize = 1;
 
 #[derive(Clone, Debug)]
 pub struct BlockchainService {
-    client: WsClient,
+    client: AnyClient,
 }
 
 impl BlockchainService {
@@ -27,7 +27,7 @@ impl BlockchainService {
 
             runtime.block_on(async {
                 let this = Self {
-                    client: WsClient::new(rpc).await?,
+                    client: AnyClient::new(rpc).await?,
                 };
                 while let Some(header) =
                     this.client.block_headers().await?.next().await
