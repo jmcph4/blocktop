@@ -9,7 +9,7 @@ use crate::db::Database;
 mod app;
 mod components;
 
-const TICK_MILLIS: u64 = 500; /* 500ms */
+const TICK_MILLIS: u64 = 250; /* 250ms */
 
 /// Drives the TUI app
 pub fn run(mut terminal: DefaultTerminal, db: &Database) -> eyre::Result<()> {
