@@ -1,12 +1,15 @@
 #![allow(async_fn_in_trait)]
-use std::sync::Arc;
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use alloy::{
     primitives::ChainId,
     providers::{
         IpcConnect, Provider, ProviderBuilder, RootProvider, WsConnect,
     },
-    pubsub::PubSubFrontend,
+    pubsub::{PubSubConnect, PubSubFrontend},
     rpc::types::{Block, Header, Transaction},
 };
 use eyre::eyre;
@@ -38,7 +41,12 @@ impl AnyClient {
     pub async fn new(url: Url) -> eyre::Result<Self> {
         match url.scheme() {
             "ws" | "wss" => Ok(AnyClient::Ws(WsClient::new(url.into()).await?)),
-            "ipc" => Ok(AnyClient::Ipc(IpcClient::new(url.into()).await?)),
+            "ipc" => Ok(AnyClient::Ipc(
+                IpcClient::new::<PathBuf>(
+                    url.to_string().strip_prefix("ipc://").unwrap().into(),
+                )
+                .await?,
+            )),
             _ => Err(eyre!("Unsupported URL scheme")),
         }
     }
@@ -158,22 +166,26 @@ impl Client for WsClient {
 
 #[derive(Clone, Debug)]
 pub struct IpcClient {
-    url: Url,
+    path: PathBuf,
     chain_id: ChainId,
     provider: Arc<RootProvider<PubSubFrontend>>,
 }
 
 impl IpcClient {
-    pub async fn new(url: Url) -> eyre::Result<Self> {
-        let ipc = IpcConnect::new(url.to_string());
+    pub async fn new<P: AsRef<Path> + Clone>(path: P) -> eyre::Result<Self>
+    where
+        IpcConnect<P>: PubSubConnect,
+    {
+        let ipc = IpcConnect::new(path.clone());
         let provider = Arc::new(ProviderBuilder::new().on_ipc(ipc).await?);
         let chain_id = provider.get_chain_id().await?;
         info!(
-            "IPC client initialised (endpoint: {}, chain: {})",
-            url, chain_id
+            "IPC client initialised (endpoint: ipc://{}, chain: {})",
+            path.clone().as_ref().display(),
+            chain_id
         );
         Ok(Self {
-            url,
+            path: path.as_ref().into(),
             chain_id,
             provider,
         })
@@ -182,7 +194,7 @@ impl IpcClient {
 
 impl Client for IpcClient {
     fn url(&self) -> Url {
-        self.url.clone()
+        format!("ipc://{}", self.path.display()).parse().unwrap()
     }
 
     fn chain_id(&self) -> ChainId {
