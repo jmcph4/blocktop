@@ -8,4 +8,6 @@
  - Store block headers to a local SQLite database in memory
  - Operate headlessly
  - Plot gas usage of most recent blocks as a barchart
+ - Connect to an Ethereum EL node via Websockets
+ - Connect to an Ethereum EL node via IPC (i.e., Unix sockets)
 
