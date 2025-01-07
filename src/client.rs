@@ -40,7 +40,7 @@ pub enum AnyClient {
 impl AnyClient {
     pub async fn new(url: Url) -> eyre::Result<Self> {
         match url.scheme() {
-            "ws" | "wss" => Ok(AnyClient::Ws(WsClient::new(url.into()).await?)),
+            "ws" | "wss" => Ok(AnyClient::Ws(WsClient::new(url).await?)),
             "ipc" => Ok(AnyClient::Ipc(
                 IpcClient::new::<PathBuf>(
                     url.to_string().strip_prefix("ipc://").unwrap().into(),

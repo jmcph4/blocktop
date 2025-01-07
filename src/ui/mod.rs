@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use app::App;
-use crossterm::event::{self, Event, KeyCode, KeyEventKind};
+use crossterm::event::{self, Event, KeyCode};
 use ratatui::DefaultTerminal;
 
 use crate::db::Database;
@@ -23,10 +23,11 @@ pub fn run(mut terminal: DefaultTerminal, db: &Database) -> eyre::Result<()> {
         let timeout = tick_rate.saturating_sub(last_tick.elapsed());
         if event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    if let KeyCode::Char(c) = key.code {
-                        app.on_key(c)
-                    }
+                match key.code {
+                    KeyCode::Up | KeyCode::Char('k') => app.on_up(),
+                    KeyCode::Down | KeyCode::Char('j') => app.on_down(),
+                    KeyCode::Char(c) => app.on_key(c),
+                    _ => {}
                 }
             }
         }

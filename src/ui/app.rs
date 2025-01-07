@@ -34,6 +34,14 @@ impl App {
         }
     }
 
+    pub fn on_up(&mut self) {
+        self.block_headers.previous();
+    }
+
+    pub fn on_down(&mut self) {
+        self.block_headers.next();
+    }
+
     pub fn on_tick(&mut self, db: &Database) {
         if let Ok(Some(header)) = db.latest_block_header() {
             if !self.block_headers.items.contains(&header) {
@@ -94,11 +102,14 @@ impl App {
                 ])])
             })
             .collect();
-        let latest_blocks_list = List::new(block_headers).block(
-            Block::bordered()
-                .title(Line::from("Latest blocks").centered())
-                .border_style(Color::Green),
-        );
+        let latest_blocks_list = List::new(block_headers)
+            .block(
+                Block::bordered()
+                    .title(Line::from("Latest blocks").centered())
+                    .border_style(Color::Green),
+            )
+            .highlight_style(Style::default().bg(Color::Magenta))
+            .highlight_symbol("> ");
         frame.render_stateful_widget(
             latest_blocks_list,
             area,
