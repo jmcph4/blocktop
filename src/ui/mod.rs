@@ -26,6 +26,7 @@ pub fn run(mut terminal: DefaultTerminal, db: &Database) -> eyre::Result<()> {
                 match key.code {
                     KeyCode::Up | KeyCode::Char('k') => app.on_up(),
                     KeyCode::Down | KeyCode::Char('j') => app.on_down(),
+                    KeyCode::Enter => app.on_enter(),
                     KeyCode::Char(c) => app.on_key(c),
                     _ => {}
                 }

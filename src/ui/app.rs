@@ -13,11 +13,25 @@ use crate::{db::Database, utils::BuilderIdentity};
 
 use super::components::stateful_list::StatefulList;
 
+#[derive(Copy, Clone, Debug)]
+pub enum View {
+    Default,
+    Block,
+}
+
+impl Default for View {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct App {
     pub title: String,
     pub should_quit: bool,
     pub block_headers: StatefulList<Header>,
+    pub view: View,
+    pub selected_block: Option<alloy::rpc::types::Block>,
 }
 
 impl App {
@@ -31,6 +45,12 @@ impl App {
     pub fn on_key(&mut self, c: char) {
         if c == 'q' {
             self.should_quit = true;
+        }
+    }
+
+    pub fn on_enter(&mut self) {
+        if self.get_selected().is_some() {
+            self.view = View::Block;
         }
     }
 
@@ -48,6 +68,10 @@ impl App {
                 self.block_headers.items.push(header);
             }
         }
+
+        if let Some(header) = self.get_selected() {
+            self.selected_block = db.block(header.number.into());
+        }
     }
 
     pub fn draw(&mut self, frame: &mut Frame) {
@@ -59,8 +83,20 @@ impl App {
             .border_style(Color::Green);
         frame.render_widget(app_box.clone(), frame.area());
         app_box.inner(chunks[1]);
-        self.draw_latest_blocks_list(frame, chunks[1]);
-        self.draw_gas_barchart(frame, chunks[0], app_box);
+
+        match self.view {
+            View::Default => {
+                self.draw_latest_blocks_list(frame, chunks[1]);
+                self.draw_gas_barchart(frame, chunks[0], app_box);
+            }
+            View::Block => {
+                self.draw_block_view(frame, frame.area());
+            }
+        }
+    }
+
+    fn draw_block_view(&mut self, frame: &mut Frame, area: Rect) {
+        todo!()
     }
 
     fn draw_latest_blocks_list(&mut self, frame: &mut Frame, area: Rect) {
@@ -159,5 +195,13 @@ impl App {
             .collect();
         xs = xs.clone().bars(&bars[..]);
         xs.clone()
+    }
+
+    fn get_selected(&self) -> Option<&Header> {
+        self.block_headers
+            .state
+            .selected()
+            .map(|offset| self.block_headers.items.get(offset))
+            .flatten()
     }
 }

@@ -1,8 +1,9 @@
 use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use alloy::{
+    eips::BlockNumberOrTag,
     primitives::{BlockNumber, B256, U256},
-    rpc::types::eth::Header,
+    rpc::types::{eth::Header, Block},
 };
 use eyre::eyre;
 use r2d2::Pool;
@@ -92,6 +93,10 @@ impl Database {
                 _ => Err(eyre!(e)),
             },
         }
+    }
+
+    pub fn block(&self, tag: BlockNumberOrTag) -> Option<Block> {
+        None
     }
 
     pub fn add_block_header(&self, header: &Header) -> eyre::Result<()> {
