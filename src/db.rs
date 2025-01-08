@@ -96,7 +96,11 @@ impl Database {
     }
 
     pub fn block(&self, tag: BlockNumberOrTag) -> Option<Block> {
-        None
+        Some(Block::default()) /* TODO(jmcph4): placeholder */
+    }
+
+    pub fn latest_block(&self) -> Option<Block> {
+        Some(Block::default()) /* TODO(jmcph4): placeholder */
     }
 
     pub fn add_block_header(&self, header: &Header) -> eyre::Result<()> {
