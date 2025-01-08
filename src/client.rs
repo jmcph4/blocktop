@@ -5,6 +5,7 @@ use std::{
 };
 
 use alloy::{
+    eips::BlockNumberOrTag,
     primitives::ChainId,
     providers::{
         IpcConnect, Provider, ProviderBuilder, RootProvider, WsConnect,
@@ -29,6 +30,7 @@ pub trait Client {
     async fn pending_transactions(
         &self,
     ) -> eyre::Result<Box<dyn Stream<Item = Transaction> + Unpin>>;
+    async fn block(&self, tag: BlockNumberOrTag) -> eyre::Result<Block>;
 }
 
 #[derive(Clone, Debug)]
@@ -91,6 +93,13 @@ impl Client for AnyClient {
         Ok(match self {
             Self::Ws(t) => t.pending_transactions().await?,
             Self::Ipc(t) => t.pending_transactions().await?,
+        })
+    }
+
+    async fn block(&self, tag: BlockNumberOrTag) -> eyre::Result<Block> {
+        Ok(match self {
+            Self::Ws(t) => t.block(tag).await?,
+            Self::Ipc(t) => t.block(tag).await?,
         })
     }
 }
@@ -162,6 +171,21 @@ impl Client for WsClient {
                 .into_stream(),
         ))
     }
+
+    async fn block(&self, tag: BlockNumberOrTag) -> eyre::Result<Block> {
+        debug!("Retrieving block {}...", tag);
+        match self
+            .provider
+            .get_block(
+                tag.into(),
+                alloy::rpc::types::BlockTransactionsKind::Full,
+            )
+            .await?
+        {
+            Some(t) => Ok(t),
+            None => Err(eyre!("No block")),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -227,5 +251,20 @@ impl Client for IpcClient {
                 .await?
                 .into_stream(),
         ))
+    }
+
+    async fn block(&self, tag: BlockNumberOrTag) -> eyre::Result<Block> {
+        debug!("Retrieving block {}...", tag);
+        match self
+            .provider
+            .get_block(
+                tag.into(),
+                alloy::rpc::types::BlockTransactionsKind::Full,
+            )
+            .await?
+        {
+            Some(t) => Ok(t),
+            None => Err(eyre!("No block")),
+        }
     }
 }
