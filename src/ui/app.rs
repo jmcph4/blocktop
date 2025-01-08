@@ -5,7 +5,7 @@ use ratatui::{
     style::{Color, Style, Stylize},
     symbols,
     text::{Line, Span},
-    widgets::{Bar, BarChart, BarGroup, Block, List, ListItem},
+    widgets::{Bar, BarChart, BarGroup, Block, List, ListItem, Row, Table},
     Frame,
 };
 
@@ -75,28 +75,43 @@ impl App {
     }
 
     pub fn draw(&mut self, frame: &mut Frame) {
-        let chunks =
-            Layout::vertical([Constraint::Min(20), Constraint::Min(0)])
-                .split(frame.area());
         let app_box = Block::bordered()
             .title(Line::from(self.title.clone()).centered())
             .border_style(Color::Green);
         frame.render_widget(app_box.clone(), frame.area());
-        app_box.inner(chunks[1]);
 
         match self.view {
             View::Default => {
+                let chunks =
+                    Layout::vertical([Constraint::Min(20), Constraint::Min(0)])
+                        .split(frame.area());
                 self.draw_latest_blocks_list(frame, chunks[1]);
                 self.draw_gas_barchart(frame, chunks[0], app_box);
             }
             View::Block => {
-                self.draw_block_view(frame, frame.area());
+                let chunks =
+                    Layout::vertical([Constraint::Min(20), Constraint::Min(0)])
+                        .split(frame.area());
+                self.draw_block_view(frame, chunks[0]);
             }
         }
     }
 
     fn draw_block_view(&mut self, frame: &mut Frame, area: Rect) {
-        todo!()
+        let block = self.selected_block.as_ref().expect(
+            "invariant violated: entered block view without selected block",
+        );
+        let block_header_table = Table::new(
+            vec![
+                Row::new(vec!["Number", "Hash"]),
+                Row::new(vec![
+                    block.header.number.to_string(),
+                    block.header.hash.to_string(),
+                ]),
+            ],
+            [Constraint::Length(16), Constraint::Length(64)],
+        );
+        frame.render_widget(block_header_table, area);
     }
 
     fn draw_latest_blocks_list(&mut self, frame: &mut Frame, area: Rect) {

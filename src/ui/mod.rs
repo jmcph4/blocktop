@@ -14,6 +14,7 @@ const TICK_MILLIS: u64 = 250; /* 250ms */
 /// Drives the TUI app
 pub fn run(mut terminal: DefaultTerminal, db: &Database) -> eyre::Result<()> {
     let mut app = App::new("blocktop".to_string());
+    app.selected_block = db.latest_block();
     let tick_rate: Duration = Duration::from_millis(TICK_MILLIS);
     let mut last_tick = Instant::now();
 
