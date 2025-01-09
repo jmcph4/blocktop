@@ -42,6 +42,13 @@ impl App {
         }
     }
 
+    pub fn on_esc(&mut self) {
+        match self.view {
+            View::Default => self.should_quit = true,
+            _ => self.view = View::Default,
+        }
+    }
+
     pub fn on_key(&mut self, c: char) {
         if c == 'q' {
             self.should_quit = true;
