@@ -1,11 +1,12 @@
-use std::{path::PathBuf, sync::Arc, time::Duration};
+use std::{iter::zip, path::PathBuf, sync::Arc, time::Duration};
 
 use alloy::{
+    consensus::{TxEip4844Variant, TxEnvelope},
     eips::BlockNumberOrTag,
-    primitives::{BlockNumber, B256, U256},
+    primitives::{Address, BlockNumber, TxKind, B256, U256},
     rpc::types::{eth::Header, Block, Transaction},
 };
-use eyre::eyre;
+use eyre::{eyre, ErrReport};
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, Params, Row};
@@ -112,7 +113,62 @@ impl Database {
         &self,
         transaction: &Transaction,
     ) -> eyre::Result<()> {
-        todo!()
+        let tx_info = transaction.info();
+
+        let to = match &transaction.inner {
+            TxEnvelope::Legacy(t) => match t.tx().to {
+                TxKind::Create => Address::ZERO,
+                TxKind::Call(a) => a,
+            },
+            TxEnvelope::Eip2930(t) => match t.tx().to {
+                TxKind::Create => Address::ZERO,
+                TxKind::Call(a) => a,
+            },
+            TxEnvelope::Eip1559(t) => match t.tx().to {
+                TxKind::Create => Address::ZERO,
+                TxKind::Call(a) => a,
+            },
+            TxEnvelope::Eip4844(t) => match t.tx() {
+                TxEip4844Variant::TxEip4844(tx_eip4844) => tx_eip4844.to,
+                TxEip4844Variant::TxEip4844WithSidecar(
+                    tx_eip4844_with_sidecar,
+                ) => tx_eip4844_with_sidecar.tx.to,
+            },
+            TxEnvelope::Eip7702(t) => t.tx().to,
+        };
+        let tx_type: u8 = transaction.inner.tx_type().into();
+
+        if tx_info.hash.is_none()
+            || tx_info.block_hash.is_none()
+            || tx_info.block_number.is_none()
+            || tx_info.index.is_none()
+        {
+            Err(eyre!("Invalid transaction information for database"))
+        } else {
+            self.transact(
+                "INSERT INTO transactions (
+                        hash,
+                        block_number,
+                        position,
+                        to_address,
+                        type
+                    ) VALUES(
+                        ?1,
+                        ?2,
+                        ?3,
+                        ?4,
+                        ?5
+                    )"
+                .to_string(),
+                params![
+                    tx_info.hash.unwrap().to_string(),
+                    tx_info.block_number.unwrap().to_string(),
+                    tx_info.index.unwrap().to_string(),
+                    to.to_string(),
+                    tx_type.to_string(),
+                ],
+            )
+        }
     }
 
     pub fn add_transactions(
@@ -214,6 +270,27 @@ impl Database {
         )
     }
 
+    fn transact_many<P>(
+        &self,
+        sqls: Vec<String>,
+        params: Vec<P>,
+    ) -> eyre::Result<()>
+    where
+        P: Params,
+    {
+        let mut conn = self.conn_pool.get()?;
+        let tx = conn.transaction()?;
+        {
+            zip(sqls, params).try_for_each(|(st, px)| {
+                let mut statement = tx.prepare(&st)?;
+                statement.execute(px)?;
+                Ok::<(), ErrReport>(())
+            })?;
+        }
+        tx.commit()?;
+        Ok(())
+    }
+
     fn transact<P>(&self, sql: String, params: P) -> eyre::Result<()>
     where
         P: Params,
@@ -229,8 +306,9 @@ impl Database {
     }
 
     fn initialise(&mut self) -> eyre::Result<()> {
-        self.transact(
-            "CREATE TABLE IF NOT EXISTS block_headers (
+        self.transact_many(
+            vec![
+                "CREATE TABLE IF NOT EXISTS block_headers (
             inserted_at TIMESTAMP,
             hash STRING,
             number INTEGER,
@@ -255,8 +333,30 @@ impl Database {
             parent_beacon_block_root STRING,
             requests_hash INTEGER
         )"
-            .to_string(),
-            (),
+                .to_string(),
+                "CREATE TABLE IF NOT EXISTS transactions (
+                hash TEXT,
+                block_number INTEGER NOT NULL,
+                position INTEGER NOT NULL,
+                from_address TEXT,
+                type INTEGER NOT NULL,
+
+                -- Legacy
+                chain_id INTEGER,
+                nonce INTEGER,
+                gas_price INTEGER,
+                gas_limit INTEGER,
+                to_address TEXT,
+                value INTEGER,
+                input BLOB,
+
+                -- EIP-1559
+                max_fee_per_gas INTEGER,
+                max_priority_fee_per_gas INTEGER
+            )"
+                .to_string(),
+            ],
+            vec![(), ()],
         )
     }
 
