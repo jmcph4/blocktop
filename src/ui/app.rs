@@ -70,7 +70,9 @@ impl App {
         }
 
         if let Some(header) = self.get_selected() {
-            self.selected_block = db.block(header.number.into());
+            if !matches!(self.view, View::Block) {
+                self.selected_block = db.block(header.number.into());
+            }
         }
     }
 
@@ -230,7 +232,6 @@ impl App {
         self.block_headers
             .state
             .selected()
-            .map(|offset| self.block_headers.items.get(offset))
-            .flatten()
+            .and_then(|offset| self.block_headers.items.get(offset))
     }
 }
