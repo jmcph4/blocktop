@@ -95,12 +95,17 @@ impl Database {
         }
     }
 
-    pub fn block(&self, tag: BlockNumberOrTag) -> Option<Block> {
-        Some(Block::default()) /* TODO(jmcph4): placeholder */
+    pub fn block(&self, _tag: BlockNumberOrTag) -> Option<Block> {
+        self.latest_block() /* TODO(jmcph4): placeholder */
     }
 
     pub fn latest_block(&self) -> Option<Block> {
-        Some(Block::default()) /* TODO(jmcph4): placeholder */
+        self.latest_block_header().ok().flatten().map(|header| {
+            Block::new(
+                header,
+                alloy::rpc::types::BlockTransactions::Full(vec![]),
+            )
+        }) /* TODO(jmcph4): placeholder */
     }
 
     pub fn add_block_header(&self, header: &Header) -> eyre::Result<()> {
