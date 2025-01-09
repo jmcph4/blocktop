@@ -8,3 +8,5 @@ flowchart LR
     Database --> TUI
 ```
 
+`blocktop` is mulithreaded: RPC node communication, database connection, and the UI each have their own threads.
+
