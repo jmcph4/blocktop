@@ -10,4 +10,6 @@
  - Plot gas usage of most recent blocks as a barchart
  - Connect to an Ethereum EL node via Websockets
  - Connect to an Ethereum EL node via IPC (i.e., Unix sockets)
+ - Open a block on Etherscan in the default system web browser
+ - Display details of a particular block
 
