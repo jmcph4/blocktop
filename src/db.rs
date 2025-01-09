@@ -1,3 +1,4 @@
+//! SQLite database interaction for storing indexed blockchain data
 use std::{iter::zip, path::PathBuf, sync::Arc, time::Duration};
 
 use alloy::{
@@ -14,9 +15,12 @@ use rusqlite::{params, Params, Row};
 const CONN_GET_TIMEOUT_MILLIS: u64 = 1_000; /* 1 second */
 const CONN_IDLE_TIMEOUT_MILLIS: u64 = 1_000; /* 1 second */
 
+/// Represents where to store a [`Database`]
 #[derive(Clone, Debug)]
 pub enum Location {
+    /// On-disk at the given filepath
     Disk(PathBuf),
+    /// In-memory (the default)
     Memory,
 }
 
@@ -26,12 +30,19 @@ impl Default for Location {
     }
 }
 
+/// Handle to the SQLite database storing indexed chain data
 #[derive(Clone, Debug)]
 pub struct Database {
+    /// Connection pool
     pub conn_pool: Arc<Pool<SqliteConnectionManager>>,
 }
 
 impl Database {
+    /// Creates a new [`Database`] instance at the given [`Location`]
+    ///
+    /// This will initialise the database with the necessary schema in an
+    /// idempotent fashion as well as handle any (unlikely to occur) connection
+    /// timeouts.
     pub fn new(location: Location) -> eyre::Result<Self> {
         let mut this = Self {
             conn_pool: Arc::new(
@@ -54,6 +65,7 @@ impl Database {
         Ok(this)
     }
 
+    /// Retrieve the has of the block with the highest timestamp (if it exists)
     pub fn latest_block_hash(&self) -> eyre::Result<Option<B256>> {
         match self.conn_pool.get()?.query_row(
             "SELECT hash FROM block_headers ORDER BY inserted_at DESC LIMIT 1",
@@ -68,6 +80,7 @@ impl Database {
         }
     }
 
+    /// Retrieve the block [`Header`] with the highest timestamp (if it exists)
     pub fn latest_block_header(&self) -> eyre::Result<Option<Header>> {
         match self.conn_pool.get()?.query_row(
             "SELECT * FROM block_headers ORDER BY inserted_at DESC LIMIT 1",
@@ -82,6 +95,7 @@ impl Database {
         }
     }
 
+    /// Retrieve the height of the block with the highest timestamp (if it exists)
     pub fn latest_block_number(&self) -> eyre::Result<Option<BlockNumber>> {
         match self.conn_pool.get()?.query_row(
             "SELECT number FROM block_headers ORDER BY inserted_at DESC LIMIT 1",
@@ -96,10 +110,12 @@ impl Database {
         }
     }
 
+    /// Retrieves the block with the associated identifier (if it exists)
     pub fn block(&self, _tag: BlockNumberOrTag) -> Option<Block> {
         self.latest_block() /* TODO(jmcph4): placeholder */
     }
 
+    /// Retrieves the [`Block`] with the highest timestamp (if it exists)
     pub fn latest_block(&self) -> Option<Block> {
         self.latest_block_header().ok().flatten().map(|header| {
             Block::new(
@@ -109,6 +125,7 @@ impl Database {
         }) /* TODO(jmcph4): placeholder */
     }
 
+    /// Write a [`Transaction`] to the database
     pub fn add_transaction(
         &self,
         transaction: &Transaction,
@@ -171,6 +188,7 @@ impl Database {
         }
     }
 
+    /// Write each transaction to the database
     pub fn add_transactions(
         &self,
         transactions: Vec<Transaction>,
@@ -180,6 +198,7 @@ impl Database {
             .try_for_each(|tx| self.add_transaction(tx))
     }
 
+    /// Write a [`Block`] to the database
     pub fn add_block(&self, block: &Block) -> eyre::Result<()> {
         self.add_block_header(&block.header)?;
         self.add_transactions(
@@ -188,6 +207,7 @@ impl Database {
         Ok(())
     }
 
+    /// Write a block [`Header`] to the database
     pub fn add_block_header(&self, header: &Header) -> eyre::Result<()> {
         self.transact(
             "INSERT INTO block_headers (

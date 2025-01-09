@@ -1,8 +1,10 @@
+//! Miscellaneous logic and types
 use std::fmt;
 
 use alloy::primitives::{Bytes, TxHash};
 use url::Url;
 
+/// Represents the (public) identity of known block builders on Ethereum mainnet
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum BuilderIdentity {
     Beaver,
@@ -89,12 +91,16 @@ impl From<Bytes> for BuilderIdentity {
     }
 }
 
+/// Given a block number, produce the Etherscan [`Url`] for the corresponding
+/// block
 pub fn etherscan_block_url(block_number: u64) -> Url {
     format!("https://etherscan.io/block/{block_number}")
         .parse()
         .expect("invariant violated: constructed invalid block URL")
 }
 
+/// Given a [`TxHash`], produce the Etherscan [`Url`] for the corresponding
+/// transaction
 pub fn etherscan_transaction_url(transaction_hash: TxHash) -> Url {
     format!("https://etherscan.io/tx/{transaction_hash}")
         .parse()

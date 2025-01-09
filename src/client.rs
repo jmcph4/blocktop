@@ -1,3 +1,4 @@
+//! Blockchain client communications
 #![allow(async_fn_in_trait)]
 use std::{
     path::{Path, PathBuf},
@@ -18,28 +19,39 @@ use futures::Stream;
 use log::{debug, info};
 use url::Url;
 
+/// Interface to an Ethereum node
 pub trait Client {
+    /// The URL of the endpoint that this client is connected to
     fn url(&self) -> Url;
+    /// The [`ChainId`] that this client is on
     fn chain_id(&self) -> ChainId;
+    /// Subscription stream yielding full [`Block`]s
     async fn blocks(
         &self,
     ) -> eyre::Result<Box<dyn Stream<Item = Block> + Unpin>>;
+    /// Subscription stream yielding only block [`Header`]s
     async fn block_headers(
         &self,
     ) -> eyre::Result<Box<dyn Stream<Item = Header> + Unpin>>;
+    /// Subscription stream yielding pending transactions from the mempool
     async fn pending_transactions(
         &self,
     ) -> eyre::Result<Box<dyn Stream<Item = Transaction> + Unpin>>;
+    /// Retrieve the [`Block`] associated with the given identifier
     async fn block(&self, tag: BlockNumberOrTag) -> eyre::Result<Block>;
 }
 
+/// Client type that is generic over all supported transports
 #[derive(Clone, Debug)]
 pub enum AnyClient {
+    /// Websockets
     Ws(WsClient),
+    /// IPC (Unix sockets)
     Ipc(IpcClient),
 }
 
 impl AnyClient {
+    /// Parse the provided [`Url`] into the corresponding [`AnyClient`]
     pub async fn new(url: Url) -> eyre::Result<Self> {
         match url.scheme() {
             "ws" | "wss" => Ok(AnyClient::Ws(WsClient::new(url).await?)),
@@ -53,6 +65,7 @@ impl AnyClient {
         }
     }
 
+    /// Handle to the internal Alloy provider
     pub fn provider(&self) -> &RootProvider<PubSubFrontend> {
         match self {
             Self::Ws(t) => t.provider(),
@@ -111,6 +124,7 @@ impl Client for AnyClient {
     }
 }
 
+/// Websocket client
 #[derive(Clone, Debug)]
 pub struct WsClient {
     url: Url,
@@ -119,6 +133,9 @@ pub struct WsClient {
 }
 
 impl WsClient {
+    /// Produce a handle to a Websocket client given a [`Url`]
+    ///
+    /// This will query the [`ChainId`] upon successful connection to the node.
     pub async fn new(url: Url) -> eyre::Result<Self> {
         let provider = Arc::new(
             ProviderBuilder::new()
@@ -203,6 +220,10 @@ pub struct IpcClient {
 }
 
 impl IpcClient {
+    /// Produce a handle to an IPC client given a filepath to a Unix named pipe
+    ///
+    /// This will query the [`ChainId`] upon successful connection to the node.
+    /// Note that this path does **not** contain an `ipc://` URI scheme prefix.
     pub async fn new<P: AsRef<Path> + Clone>(path: P) -> eyre::Result<Self>
     where
         IpcConnect<P>: PubSubConnect,
@@ -222,6 +243,7 @@ impl IpcClient {
         })
     }
 
+    /// Handle to the internal Alloy provider
     pub fn provider(&self) -> &RootProvider<PubSubFrontend> {
         &self.provider
     }

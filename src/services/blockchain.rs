@@ -1,3 +1,4 @@
+//! Indexing service for EVM chains
 use std::thread::{self, JoinHandle};
 
 use alloy::providers::Provider;
@@ -14,12 +15,19 @@ use crate::{
 
 const NUM_WORKERS: usize = 1;
 
+/// Handle to the blockchain indexing service
 #[derive(Clone, Debug)]
 pub struct BlockchainService {
     client: AnyClient,
 }
 
 impl BlockchainService {
+    /// Spawn a new instance of the indexing service on its own OS thread
+    ///
+    /// Connects to the RPC node reachable at the provided [`Url`] and indexes
+    /// data to the provided [`Database`].
+    ///
+    /// Note that joining on the returned thread handle will never yield.
     pub fn spawn(rpc: Url, db: Database) -> JoinHandle<eyre::Result<Self>> {
         thread::spawn(move || {
             let runtime = Builder::new_multi_thread()
