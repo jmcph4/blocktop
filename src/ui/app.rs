@@ -4,8 +4,8 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style, Stylize},
     symbols,
-    text::{Line, Span},
-    widgets::{Bar, BarChart, BarGroup, Block, List, ListItem, Row, Table},
+    text::{Line, Span, Text},
+    widgets::{Bar, BarChart, BarGroup, Block, List, ListItem, Paragraph},
     Frame,
 };
 
@@ -89,10 +89,12 @@ impl App {
                 self.draw_gas_barchart(frame, chunks[0], app_box);
             }
             View::Block => {
-                let chunks =
-                    Layout::vertical([Constraint::Min(20), Constraint::Min(0)])
-                        .split(frame.area());
-                self.draw_block_view(frame, chunks[0]);
+                let chunks = Layout::vertical([
+                    Constraint::Length(1),
+                    Constraint::Min(0),
+                ])
+                .split(frame.area());
+                self.draw_block_view(frame, chunks[1]);
             }
         }
     }
@@ -101,17 +103,29 @@ impl App {
         let block = self.selected_block.as_ref().expect(
             "invariant violated: entered block view without selected block",
         );
-        let block_header_table = Table::new(
-            vec![
-                Row::new(vec!["Number", "Hash"]),
-                Row::new(vec![
-                    block.header.number.to_string(),
-                    block.header.hash.to_string(),
-                ]),
-            ],
-            [Constraint::Length(16), Constraint::Length(64)],
-        );
-        frame.render_widget(block_header_table, area);
+        let lines = vec![
+            Line::from(vec![Span::styled(
+                format!("Block #{} {}", block.header.number, block.header.hash),
+                Style::default().bold(),
+            )]),
+            Line::from(vec![Span::raw(format!("Timestamp: {}", Utc.timestamp_opt(block.header.timestamp as i64, 0).unwrap()))]),
+            Line::from(vec![Span::raw(format!(
+                "Gas Usage (wei): {}  / {} ({:.2}%)        Base Fee (gwei): {:.3}",
+                block.header.gas_used,
+                block.header.gas_limit,
+                (block.header.gas_used as f64) / (block.header.gas_limit as f64) * 100.0,
+                block.header.base_fee_per_gas.unwrap_or_default() as f64
+                    / f64::powi(10.0, 9)
+            ))]),
+            Line::from(vec![Span::raw(
+                match BuilderIdentity::from(block.header.extra_data.clone()) {
+                    BuilderIdentity::Local => format!("Beneficiary: {} (locally built)", block.header.beneficiary),
+                    iden => format!("Beneficiary: {} ({})", block.header.beneficiary, iden),
+                })]),
+                Line::from(vec![Span::raw(format!("State Root: {}", block.header.state_root))])
+        ];
+        let block_header_text = Paragraph::new(Text::from(lines));
+        frame.render_widget(block_header_text, area);
     }
 
     fn draw_latest_blocks_list(&mut self, frame: &mut Frame, area: Rect) {
