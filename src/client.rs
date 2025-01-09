@@ -52,6 +52,13 @@ impl AnyClient {
             _ => Err(eyre!("Unsupported URL scheme")),
         }
     }
+
+    pub fn provider(&self) -> &RootProvider<PubSubFrontend> {
+        match self {
+            Self::Ws(t) => t.provider(),
+            Self::Ipc(t) => t.provider(),
+        }
+    }
 }
 
 impl Client for AnyClient {
@@ -213,6 +220,10 @@ impl IpcClient {
             chain_id,
             provider,
         })
+    }
+
+    pub fn provider(&self) -> &RootProvider<PubSubFrontend> {
+        &self.provider
     }
 }
 

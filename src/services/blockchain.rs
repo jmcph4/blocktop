@@ -1,5 +1,7 @@
 use std::thread::{self, JoinHandle};
 
+use alloy::providers::Provider;
+use eyre::eyre;
 use futures::StreamExt;
 use log::debug;
 use tokio::runtime::Builder;
@@ -33,7 +35,16 @@ impl BlockchainService {
                 while let Some(header) =
                     this.client.block_headers().await?.next().await
                 {
-                    db.add_block_header(&header)?;
+                    let block = this
+                        .client
+                        .provider()
+                        .get_block_by_hash(
+                            header.hash,
+                            alloy::rpc::types::BlockTransactionsKind::Full,
+                        )
+                        .await?
+                        .ok_or(eyre!("No such block"))?;
+                    db.add_block(&block)?;
                     debug!("Saved header: {}", &header.hash);
                 }
                 Ok(this)
