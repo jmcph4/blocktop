@@ -1,6 +1,7 @@
 use std::fmt;
 
 use alloy::primitives::Bytes;
+use url::Url;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum BuilderIdentity {
@@ -86,4 +87,10 @@ impl From<Bytes> for BuilderIdentity {
     fn from(value: Bytes) -> Self {
         value.to_vec().into()
     }
+}
+
+pub fn etherscan_block_url(block_number: u64) -> Url {
+    format!("https://etherscan.io/block/{block_number}")
+        .parse()
+        .expect("invariant violated: constructed invalid URL")
 }

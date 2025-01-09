@@ -9,7 +9,10 @@ use ratatui::{
     Frame,
 };
 
-use crate::{db::Database, utils::BuilderIdentity};
+use crate::{
+    db::Database,
+    utils::{etherscan_block_url, BuilderIdentity},
+};
 
 use super::components::stateful_list::StatefulList;
 
@@ -52,6 +55,18 @@ impl App {
     pub fn on_key(&mut self, c: char) {
         if c == 'q' {
             self.should_quit = true;
+        }
+
+        if let View::Block = self.view {
+            if c == 'e' {
+                webbrowser::open(
+                    etherscan_block_url(
+                        self.selected_block.clone().expect("").header.number,
+                    )
+                    .as_str(),
+                )
+                .unwrap()
+            }
         }
     }
 
