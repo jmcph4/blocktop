@@ -1,6 +1,6 @@
 use std::fmt;
 
-use alloy::primitives::Bytes;
+use alloy::primitives::{Bytes, TxHash};
 use url::Url;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -92,5 +92,11 @@ impl From<Bytes> for BuilderIdentity {
 pub fn etherscan_block_url(block_number: u64) -> Url {
     format!("https://etherscan.io/block/{block_number}")
         .parse()
-        .expect("invariant violated: constructed invalid URL")
+        .expect("invariant violated: constructed invalid block URL")
+}
+
+pub fn etherscan_transaction_url(transaction_hash: TxHash) -> Url {
+    format!("https://etherscan.io/tx/{transaction_hash}")
+        .parse()
+        .expect("invariant violated: constructed invalid transaction URL")
 }
