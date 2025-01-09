@@ -3,7 +3,7 @@ use std::{path::PathBuf, sync::Arc, time::Duration};
 use alloy::{
     eips::BlockNumberOrTag,
     primitives::{BlockNumber, B256, U256},
-    rpc::types::{eth::Header, Block},
+    rpc::types::{eth::Header, Block, Transaction},
 };
 use eyre::eyre;
 use r2d2::Pool;
@@ -106,6 +106,30 @@ impl Database {
                 alloy::rpc::types::BlockTransactions::Full(vec![]),
             )
         }) /* TODO(jmcph4): placeholder */
+    }
+
+    pub fn add_transaction(
+        &self,
+        transaction: &Transaction,
+    ) -> eyre::Result<()> {
+        todo!()
+    }
+
+    pub fn add_transactions(
+        &self,
+        transactions: Vec<Transaction>,
+    ) -> eyre::Result<()> {
+        transactions
+            .iter()
+            .try_for_each(|tx| self.add_transaction(tx))
+    }
+
+    pub fn add_block(&self, block: &Block) -> eyre::Result<()> {
+        self.add_block_header(&block.header)?;
+        self.add_transactions(
+            block.transactions.clone().into_transactions().collect(),
+        )?;
+        Ok(())
     }
 
     pub fn add_block_header(&self, header: &Header) -> eyre::Result<()> {
