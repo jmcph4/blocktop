@@ -2,9 +2,11 @@
 use std::{iter::zip, path::PathBuf, sync::Arc, time::Duration};
 
 use alloy::{
-    consensus::{TxEip4844Variant, TxEnvelope},
+    consensus::{
+        TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope, TxLegacy,
+    },
     eips::BlockNumberOrTag,
-    primitives::{Address, BlockNumber, TxKind, B256, U256},
+    primitives::{Address, BlockNumber, TxHash, TxKind, B256, U256},
     rpc::types::{eth::Header, Block, Transaction},
 };
 use eyre::{eyre, ErrReport};
@@ -113,6 +115,24 @@ impl Database {
     /// Retrieves the block with the associated identifier (if it exists)
     pub fn block(&self, _tag: BlockNumberOrTag) -> Option<Block> {
         self.latest_block() /* TODO(jmcph4): placeholder */
+    }
+
+    /// Retrieves the transaction with the associated hash (if it exists)
+    pub fn transaction(
+        &self,
+        hash: TxHash,
+    ) -> eyre::Result<Option<Transaction>> {
+        match self.conn_pool.get()?.query_row(
+            "SELECT * FROM transactions WHERE hash = ?1 LIMIT 1",
+            [hash.to_string()],
+            |row| Ok(Self::row_to_transaction(row)),
+        ) {
+            Ok(t) => Ok(Some(t?)),
+            Err(e) => match e {
+                rusqlite::Error::QueryReturnedNoRows => Ok(None),
+                _ => Err(eyre!(e)),
+            },
+        }
     }
 
     /// Retrieves the [`Block`] with the highest timestamp (if it exists)
@@ -356,6 +376,7 @@ impl Database {
                 .to_string(),
                 "CREATE TABLE IF NOT EXISTS transactions (
                 hash TEXT,
+                block_hash TEXT,
                 block_number INTEGER NOT NULL,
                 position INTEGER NOT NULL,
                 from_address TEXT,
@@ -378,6 +399,89 @@ impl Database {
             ],
             vec![(), ()],
         )
+    }
+
+    fn row_to_transaction(row: &Row) -> eyre::Result<Transaction> {
+        let chain_id = row.get::<&str, u64>("chain_id")?;
+        let nonce = row.get::<&str, u64>("nonce")?;
+        let gas_price = row.get::<&str, u64>("gas_price")?;
+        let gas_limit = row.get::<&str, u64>("gas_limit")?;
+        let to: Address = row.get::<&str, String>("to_address")?.parse()?;
+        let value: U256 = row.get::<&str, String>("value")?.parse()?;
+        let input = row.get::<&str, Vec<u8>>("input")?;
+
+        let max_fee_per_gas = row.get::<&str, u64>("max_fee_per_gas")?;
+        let max_priority_fee_per_gas =
+            row.get::<&str, u64>("max_priority_fee_per_gas")?;
+
+        let tx_type = row.get::<&str, u64>("type")?;
+
+        let inner: TxEnvelope = match tx_type {
+            0 => TxEnvelope::Legacy(TxLegacy {
+                chain_id: Some(chain_id),
+                nonce,
+                gas_price: gas_price.into(),
+                gas_limit,
+                to: match to {
+                    Address::ZERO => TxKind::Create,
+                    t => TxKind::Call(t),
+                },
+                value,
+                input: input.into(),
+            }),
+            1 => TxEnvelope::Eip2930(TxEip2930 {
+                chain_id,
+                nonce,
+                gas_price: gas_price.into(),
+                gas_limit,
+                to: match to {
+                    Address::ZERO => TxKind::Create,
+                    t => TxKind::Call(t),
+                },
+                value,
+                access_list: vec![].into(), /* TODO(jmcph4): support access lists */
+                input: input.into(),
+            }),
+            2 => TxEnvelope::Eip1559(TxEip1559 {
+                chain_id,
+                nonce,
+                gas_limit,
+                max_fee_per_gas: max_fee_per_gas.into(),
+                max_priority_fee_per_gas: max_priority_fee_per_gas.into(),
+                to: match to {
+                    Address::ZERO => TxKind::Create,
+                    t => TxKind::Call(t),
+                },
+                value,
+                access_list: vec![].into(), /* TODO(jmcph4): support access lists */
+                input: input.into(),
+            }),
+            3 => TxEnvelope::Eip4844(TxEip4844Variant::TxEip4844(TxEip4844 {
+                chain_id,
+                nonce,
+                gas_limit,
+                max_fee_per_gas: max_fee_per_gas.into(),
+                max_priority_fee_per_gas: max_priority_fee_per_gas.into(),
+                to,
+                value,
+                access_list: vec![].into(), /* TODO(jmcph4): support access lists */
+                blob_versioned_hashes: vec![],
+                max_fee_per_blob_gas: 0,
+                input: input.into(),
+            })),
+            _ => return Err(eyre!("Unsupported EIP-2718 transaction type")),
+        };
+
+        Ok(Transaction {
+            inner,
+            block_hash: Some(row.get::<&str, String>("block_hash")?.parse()?),
+            block_number: Some(
+                row.get::<&str, String>("block_number")?.parse()?,
+            ),
+            transaction_index: Some(row.get::<&str, u64>("position")?),
+            effective_gas_price: None, /* deprecated */
+            from: row.get::<&str, String>("from_address")?.parse()?,
+        })
     }
 
     fn row_to_header(row: &Row) -> eyre::Result<Header> {
