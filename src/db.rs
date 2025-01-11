@@ -3,10 +3,13 @@ use std::{iter::zip, path::PathBuf, sync::Arc, time::Duration};
 
 use alloy::{
     consensus::{
-        TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope, TxLegacy,
+        Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
+        TxLegacy,
     },
     eips::BlockNumberOrTag,
-    primitives::{Address, BlockNumber, TxHash, TxKind, B256, U256},
+    primitives::{
+        Address, BlockNumber, PrimitiveSignature, TxHash, TxKind, B256, U256,
+    },
     rpc::types::{eth::Header, Block, Transaction},
 };
 use eyre::{eyre, ErrReport};
@@ -402,6 +405,7 @@ impl Database {
     }
 
     fn row_to_transaction(row: &Row) -> eyre::Result<Transaction> {
+        let hash = row.get::<&str, String>("hash")?.parse()?;
         let chain_id = row.get::<&str, u64>("chain_id")?;
         let nonce = row.get::<&str, u64>("nonce")?;
         let gas_price = row.get::<&str, u64>("gas_price")?;
@@ -417,58 +421,74 @@ impl Database {
         let tx_type = row.get::<&str, u64>("type")?;
 
         let inner: TxEnvelope = match tx_type {
-            0 => TxEnvelope::Legacy(TxLegacy {
-                chain_id: Some(chain_id),
-                nonce,
-                gas_price: gas_price.into(),
-                gas_limit,
-                to: match to {
-                    Address::ZERO => TxKind::Create,
-                    t => TxKind::Call(t),
+            0 => TxEnvelope::Legacy(Signed::new_unchecked(
+                TxLegacy {
+                    chain_id: Some(chain_id),
+                    nonce,
+                    gas_price: gas_price.into(),
+                    gas_limit,
+                    to: match to {
+                        Address::ZERO => TxKind::Create,
+                        t => TxKind::Call(t),
+                    },
+                    value,
+                    input: input.into(),
                 },
-                value,
-                input: input.into(),
-            }),
-            1 => TxEnvelope::Eip2930(TxEip2930 {
-                chain_id,
-                nonce,
-                gas_price: gas_price.into(),
-                gas_limit,
-                to: match to {
-                    Address::ZERO => TxKind::Create,
-                    t => TxKind::Call(t),
+                PrimitiveSignature::test_signature(),
+                hash,
+            )),
+            1 => TxEnvelope::Eip2930(Signed::new_unchecked(
+                TxEip2930 {
+                    chain_id,
+                    nonce,
+                    gas_price: gas_price.into(),
+                    gas_limit,
+                    to: match to {
+                        Address::ZERO => TxKind::Create,
+                        t => TxKind::Call(t),
+                    },
+                    value,
+                    access_list: vec![].into(), /* TODO(jmcph4): support access lists */
+                    input: input.into(),
                 },
-                value,
-                access_list: vec![].into(), /* TODO(jmcph4): support access lists */
-                input: input.into(),
-            }),
-            2 => TxEnvelope::Eip1559(TxEip1559 {
-                chain_id,
-                nonce,
-                gas_limit,
-                max_fee_per_gas: max_fee_per_gas.into(),
-                max_priority_fee_per_gas: max_priority_fee_per_gas.into(),
-                to: match to {
-                    Address::ZERO => TxKind::Create,
-                    t => TxKind::Call(t),
+                PrimitiveSignature::test_signature(),
+                hash,
+            )),
+            2 => TxEnvelope::Eip1559(Signed::new_unchecked(
+                TxEip1559 {
+                    chain_id,
+                    nonce,
+                    gas_limit,
+                    max_fee_per_gas: max_fee_per_gas.into(),
+                    max_priority_fee_per_gas: max_priority_fee_per_gas.into(),
+                    to: match to {
+                        Address::ZERO => TxKind::Create,
+                        t => TxKind::Call(t),
+                    },
+                    value,
+                    access_list: vec![].into(), /* TODO(jmcph4): support access lists */
+                    input: input.into(),
                 },
-                value,
-                access_list: vec![].into(), /* TODO(jmcph4): support access lists */
-                input: input.into(),
-            }),
-            3 => TxEnvelope::Eip4844(TxEip4844Variant::TxEip4844(TxEip4844 {
-                chain_id,
-                nonce,
-                gas_limit,
-                max_fee_per_gas: max_fee_per_gas.into(),
-                max_priority_fee_per_gas: max_priority_fee_per_gas.into(),
-                to,
-                value,
-                access_list: vec![].into(), /* TODO(jmcph4): support access lists */
-                blob_versioned_hashes: vec![],
-                max_fee_per_blob_gas: 0,
-                input: input.into(),
-            })),
+                PrimitiveSignature::test_signature(),
+                hash,
+            )),
+            3 => TxEnvelope::Eip4844(Signed::new_unchecked(
+                TxEip4844Variant::TxEip4844(TxEip4844 {
+                    chain_id,
+                    nonce,
+                    gas_limit,
+                    max_fee_per_gas: max_fee_per_gas.into(),
+                    max_priority_fee_per_gas: max_priority_fee_per_gas.into(),
+                    to,
+                    value,
+                    access_list: vec![].into(), /* TODO(jmcph4): support access lists */
+                    blob_versioned_hashes: vec![],
+                    max_fee_per_blob_gas: 0,
+                    input: input.into(),
+                }),
+                PrimitiveSignature::test_signature(),
+                hash,
+            )),
             _ => return Err(eyre!("Unsupported EIP-2718 transaction type")),
         };
 
