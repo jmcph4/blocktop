@@ -85,15 +85,19 @@ impl App {
     }
 
     pub fn on_tick(&mut self, db: &Database) {
-        if let Ok(Some(header)) = db.latest_block_header() {
+        if let Some(header) = db.latest_block_header().unwrap() {
             if !self.block_headers.items.contains(&header) {
-                self.block_headers.items.push(header);
+                self.block_headers.items.push(header.clone());
+            }
+
+            if self.selected_block.is_none() {
+                self.selected_block = db.block(header.hash).unwrap();
             }
         }
 
         if let Some(header) = self.get_selected() {
             if !matches!(self.view, View::Block) {
-                self.selected_block = db.block(header.number.into());
+                self.selected_block = db.block(header.hash).unwrap();
             }
         }
     }
@@ -124,6 +128,9 @@ impl App {
     }
 
     fn draw_block_view(&mut self, frame: &mut Frame, area: Rect) {
+        let chunks =
+            Layout::vertical([Constraint::Percentage(50), Constraint::Min(0)])
+                .split(area);
         let block = self.selected_block.as_ref().expect(
             "invariant violated: entered block view without selected block",
         );
@@ -146,10 +153,18 @@ impl App {
                     BuilderIdentity::Local => format!("Beneficiary: {} (locally built)", block.header.beneficiary),
                     iden => format!("Beneficiary: {} ({})", block.header.beneficiary, iden),
                 })]),
-                Line::from(vec![Span::raw(format!("State Root: {}", block.header.state_root))])
+                Line::from(vec![Span::raw(format!("State Root: {}", block.header.state_root))]),
+                Line::from(vec![Span::raw(format!("Contains {} transactions", block.transactions.len()))])
         ];
         let block_header_text = Paragraph::new(Text::from(lines));
-        frame.render_widget(block_header_text, area);
+        frame.render_widget(block_header_text, chunks[0]);
+
+        let transaction_list = List::new(
+            block.transactions.clone().into_transactions().map(|tx| {
+                ListItem::from(format!("{}", tx.transaction_index.unwrap()))
+            }),
+        );
+        frame.render_widget(transaction_list, chunks[1]);
     }
 
     fn draw_latest_blocks_list(&mut self, frame: &mut Frame, area: Rect) {

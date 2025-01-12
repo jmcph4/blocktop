@@ -3,19 +3,20 @@ use std::{iter::zip, path::PathBuf, sync::Arc, time::Duration};
 
 use alloy::{
     consensus::{
-        Signed, TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
-        TxLegacy,
+        Signed, Transaction as TraitTransaction, TxEip1559, TxEip2930,
+        TxEip4844, TxEip4844Variant, TxEnvelope, TxLegacy,
     },
-    eips::BlockNumberOrTag,
+    hex::FromHex,
     primitives::{
-        Address, BlockNumber, PrimitiveSignature, TxHash, TxKind, B256, U256,
+        Address, BlockHash, Bytes, PrimitiveSignature, TxHash, TxKind, U256,
     },
     rpc::types::{eth::Header, Block, Transaction},
 };
 use eyre::{eyre, ErrReport};
+use log::{debug, error};
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::{params, Params, Row};
+use rusqlite::{params, Error, Params, Row};
 
 const CONN_GET_TIMEOUT_MILLIS: u64 = 1_000; /* 1 second */
 const CONN_IDLE_TIMEOUT_MILLIS: u64 = 1_000; /* 1 second */
@@ -70,54 +71,50 @@ impl Database {
         Ok(this)
     }
 
-    /// Retrieve the has of the block with the highest timestamp (if it exists)
-    pub fn latest_block_hash(&self) -> eyre::Result<Option<B256>> {
-        match self.conn_pool.get()?.query_row(
-            "SELECT hash FROM block_headers ORDER BY inserted_at DESC LIMIT 1",
-            [],
-            |row| row.get::<usize, String>(0),
-        ) {
-            Ok(t) => Ok(Some(t.parse()?)),
-            Err(e) => match e {
-                rusqlite::Error::QueryReturnedNoRows => Ok(None),
-                _ => Err(eyre!(e)),
-            },
-        }
-    }
-
     /// Retrieve the block [`Header`] with the highest timestamp (if it exists)
     pub fn latest_block_header(&self) -> eyre::Result<Option<Header>> {
         match self.conn_pool.get()?.query_row(
-            "SELECT * FROM block_headers ORDER BY inserted_at DESC LIMIT 1",
+            "SELECT * FROM block_headers ORDER BY inserted_at DESC",
             [],
             |row| Ok(Self::row_to_header(row)),
         ) {
             Ok(t) => Ok(Some(t?)),
             Err(e) => match e {
-                rusqlite::Error::QueryReturnedNoRows => Ok(None),
-                _ => Err(eyre!(e)),
+                Error::QueryReturnedNoRows => Ok(None),
+                _ => Err(e.into()),
             },
         }
     }
 
-    /// Retrieve the height of the block with the highest timestamp (if it exists)
-    pub fn latest_block_number(&self) -> eyre::Result<Option<BlockNumber>> {
+    /// Retrieves the block [`Header`] with the given [`BlockHash`] (if it
+    /// exists)
+    pub fn header(&self, hash: BlockHash) -> eyre::Result<Option<Header>> {
+        debug!("Block header {} requested from database...", hash);
         match self.conn_pool.get()?.query_row(
-            "SELECT number FROM block_headers ORDER BY inserted_at DESC LIMIT 1",
-            [],
-            |row| row.get::<usize, u64>(0),
+            "SELECT * FROM block_headers WHERE hash = ?",
+            [hash.to_string()],
+            |row| Ok(Self::row_to_header(row)),
         ) {
-            Ok(t) => Ok(Some(t)),
+            Ok(t) => Ok(Some(t?)),
             Err(e) => match e {
-                rusqlite::Error::QueryReturnedNoRows => Ok(None),
-                _ => Err(eyre!(e)),
+                Error::QueryReturnedNoRows => Ok(None),
+                _ => Err(e.into()),
             },
         }
     }
 
     /// Retrieves the block with the associated identifier (if it exists)
-    pub fn block(&self, _tag: BlockNumberOrTag) -> Option<Block> {
-        self.latest_block() /* TODO(jmcph4): placeholder */
+    pub fn block(&self, hash: BlockHash) -> eyre::Result<Option<Block>> {
+        debug!("Block {} requested from database...", hash);
+
+        match self.header(hash).inspect_err(|e| {
+            error!("Failed to retrieve block header from the database: {e:?}")
+        })? {
+            Some(header) => Ok(Some(Block::new(header, alloy::rpc::types::BlockTransactions::Full(
+                self.transactions_by_block(hash).inspect_err(|e| error!("Failed to retrieve associated transactions from the database: {e:?}"))?
+            )))),
+            None => Ok(None),
+        }
     }
 
     /// Retrieves the transaction with the associated hash (if it exists)
@@ -125,27 +122,38 @@ impl Database {
         &self,
         hash: TxHash,
     ) -> eyre::Result<Option<Transaction>> {
+        debug!("Transaction {} requested from database...", hash);
         match self.conn_pool.get()?.query_row(
-            "SELECT * FROM transactions WHERE hash = ?1 LIMIT 1",
+            "SELECT * FROM transactions WHERE hash = ?",
             [hash.to_string()],
             |row| Ok(Self::row_to_transaction(row)),
         ) {
             Ok(t) => Ok(Some(t?)),
             Err(e) => match e {
                 rusqlite::Error::QueryReturnedNoRows => Ok(None),
-                _ => Err(eyre!(e)),
+                _ => Err(e.into()),
             },
         }
     }
 
-    /// Retrieves the [`Block`] with the highest timestamp (if it exists)
-    pub fn latest_block(&self) -> Option<Block> {
-        self.latest_block_header().ok().flatten().map(|header| {
-            Block::new(
-                header,
-                alloy::rpc::types::BlockTransactions::Full(vec![]),
-            )
-        }) /* TODO(jmcph4): placeholder */
+    /// Retrieves all of the [`Transaction`]s associated with the [`Block`]
+    /// with the given [`BlockHash`]
+    ///
+    /// If there are no such transactions in the database, the returned vector
+    /// is guaranteed to have a length of zero.
+    pub fn transactions_by_block(
+        &self,
+        hash: BlockHash,
+    ) -> eyre::Result<Vec<Transaction>> {
+        let conn = self.conn_pool.get()?;
+        let mut stmt =
+            conn.prepare("SELECT * FROM transactions WHERE block_hash = ?")?;
+        let txs = stmt
+            .query_and_then([hash.to_string()], |row| {
+                Self::row_to_transaction(row)
+            })?
+            .collect();
+        txs
     }
 
     /// Write a [`Transaction`] to the database
@@ -188,24 +196,54 @@ impl Database {
             self.transact(
                 "INSERT INTO transactions (
                         hash,
+                        block_hash,
                         block_number,
                         position,
+                        from_address,
+                        type,
+                        chain_id,
+                        nonce,
+                        gas_price,
+                        gas_limit,
                         to_address,
-                        type
+                        value,
+                        input,
+                        max_fee_per_gas,
+                        max_priority_fee_per_gas
                     ) VALUES(
                         ?1,
                         ?2,
                         ?3,
                         ?4,
-                        ?5
+                        ?5,
+                        ?6,
+                        ?7,
+                        ?8,
+                        ?9,
+                        ?10,
+                        ?11,
+                        ?12,
+                        ?13,
+                        ?14,
+                        ?15
                     )"
                 .to_string(),
                 params![
                     tx_info.hash.unwrap().to_string(),
+                    tx_info.block_hash.unwrap().to_string(),
                     tx_info.block_number.unwrap().to_string(),
                     tx_info.index.unwrap().to_string(),
-                    to.to_string(),
+                    transaction.from.to_string(),
                     tx_type.to_string(),
+                    transaction.chain_id().unwrap_or(1),
+                    transaction.nonce(),
+                    transaction.gas_price().unwrap_or_default() as u64,
+                    transaction.gas_limit(),
+                    to.to_string(),
+                    transaction.value().to_string(),
+                    transaction.input().to_string(),
+                    transaction.max_fee_per_gas() as u64,
+                    transaction.max_priority_fee_per_gas().map(|x| x as u64),
                 ],
             )
         }
@@ -391,7 +429,7 @@ impl Database {
                 gas_price INTEGER,
                 gas_limit INTEGER,
                 to_address TEXT,
-                value INTEGER,
+                value TEXT,
                 input BLOB,
 
                 -- EIP-1559
@@ -412,11 +450,11 @@ impl Database {
         let gas_limit = row.get::<&str, u64>("gas_limit")?;
         let to: Address = row.get::<&str, String>("to_address")?.parse()?;
         let value: U256 = row.get::<&str, String>("value")?.parse()?;
-        let input = row.get::<&str, Vec<u8>>("input")?;
+        let input: Bytes = Bytes::from_hex(row.get::<&str, String>("input")?)?;
 
         let max_fee_per_gas = row.get::<&str, u64>("max_fee_per_gas")?;
         let max_priority_fee_per_gas =
-            row.get::<&str, u64>("max_priority_fee_per_gas")?;
+            row.get::<&str, Option<u64>>("max_priority_fee_per_gas")?;
 
         let tx_type = row.get::<&str, u64>("type")?;
 
@@ -432,7 +470,7 @@ impl Database {
                         t => TxKind::Call(t),
                     },
                     value,
-                    input: input.into(),
+                    input: input,
                 },
                 PrimitiveSignature::test_signature(),
                 hash,
@@ -449,7 +487,7 @@ impl Database {
                     },
                     value,
                     access_list: vec![].into(), /* TODO(jmcph4): support access lists */
-                    input: input.into(),
+                    input: input,
                 },
                 PrimitiveSignature::test_signature(),
                 hash,
@@ -460,14 +498,16 @@ impl Database {
                     nonce,
                     gas_limit,
                     max_fee_per_gas: max_fee_per_gas.into(),
-                    max_priority_fee_per_gas: max_priority_fee_per_gas.into(),
+                    max_priority_fee_per_gas: max_priority_fee_per_gas
+                        .unwrap()
+                        .into(),
                     to: match to {
                         Address::ZERO => TxKind::Create,
                         t => TxKind::Call(t),
                     },
                     value,
                     access_list: vec![].into(), /* TODO(jmcph4): support access lists */
-                    input: input.into(),
+                    input: input,
                 },
                 PrimitiveSignature::test_signature(),
                 hash,
@@ -478,13 +518,15 @@ impl Database {
                     nonce,
                     gas_limit,
                     max_fee_per_gas: max_fee_per_gas.into(),
-                    max_priority_fee_per_gas: max_priority_fee_per_gas.into(),
+                    max_priority_fee_per_gas: max_priority_fee_per_gas
+                        .unwrap()
+                        .into(),
                     to,
                     value,
                     access_list: vec![].into(), /* TODO(jmcph4): support access lists */
                     blob_versioned_hashes: vec![],
                     max_fee_per_blob_gas: 0,
-                    input: input.into(),
+                    input: input,
                 }),
                 PrimitiveSignature::test_signature(),
                 hash,
@@ -495,9 +537,7 @@ impl Database {
         Ok(Transaction {
             inner,
             block_hash: Some(row.get::<&str, String>("block_hash")?.parse()?),
-            block_number: Some(
-                row.get::<&str, String>("block_number")?.parse()?,
-            ),
+            block_number: Some(row.get::<&str, u64>("block_number")?),
             transaction_index: Some(row.get::<&str, u64>("position")?),
             effective_gas_price: None, /* deprecated */
             from: row.get::<&str, String>("from_address")?.parse()?,

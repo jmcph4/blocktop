@@ -4,7 +4,7 @@ use std::thread::{self, JoinHandle};
 use alloy::providers::Provider;
 use eyre::eyre;
 use futures::StreamExt;
-use log::debug;
+use log::{debug, error};
 use tokio::runtime::Builder;
 use url::Url;
 
@@ -52,7 +52,9 @@ impl BlockchainService {
                         )
                         .await?
                         .ok_or(eyre!("No such block"))?;
-                    db.add_block(&block)?;
+                    db.add_block(&block).inspect_err(|e| {
+                        error!("Failed to write block to database: {e:?}")
+                    })?;
                     debug!("Saved header: {}", &header.hash);
                 }
                 Ok(this)
