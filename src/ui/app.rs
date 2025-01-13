@@ -161,6 +161,7 @@ impl App {
                     Constraint::Length(1),
                     Constraint::Min(0),
                 ])
+                .margin(1)
                 .split(frame.area());
                 self.draw_block_view(frame, chunks[1]);
             }
