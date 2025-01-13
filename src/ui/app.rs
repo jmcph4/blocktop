@@ -34,13 +34,17 @@ pub struct App {
     pub should_quit: bool,
     pub block_headers: StatefulList<Header>,
     pub view: View,
-    pub selected_block: Option<alloy::rpc::types::Block>,
+    pub selected_block: alloy::rpc::types::Block,
 }
 
 impl App {
-    pub fn new(title: String) -> Self {
+    pub fn new(
+        title: String,
+        selected_block: alloy::rpc::types::Block,
+    ) -> Self {
         Self {
             title,
+            selected_block,
             ..Self::default()
         }
     }
@@ -61,7 +65,7 @@ impl App {
             if c == 'e' {
                 webbrowser::open(
                     etherscan_block_url(
-                        self.selected_block.clone().expect("").header.number,
+                        self.selected_block.clone().header.number,
                     )
                     .as_str(),
                 )
@@ -85,19 +89,22 @@ impl App {
     }
 
     pub fn on_tick(&mut self, db: &Database) {
-        if let Some(header) = db.latest_block_header().unwrap() {
-            if !self.block_headers.items.contains(&header) {
-                self.block_headers.items.push(header.clone());
-            }
+        let latest_header = db
+            .latest_block_header()
+            .unwrap()
+            .expect("invariant violated: must always have at least one header");
 
-            if self.selected_block.is_none() {
-                self.selected_block = db.block(header.hash).unwrap();
-            }
+        if !self.block_headers.items.contains(&latest_header) {
+            self.block_headers.items.push(latest_header.clone());
         }
 
-        if let Some(header) = self.get_selected() {
+        if let Some(selected_header) = self.get_selected() {
             if !matches!(self.view, View::Block) {
-                self.selected_block = db.block(header.hash).unwrap();
+                if let Some(selected_block) =
+                    db.block(selected_header.hash).unwrap()
+                {
+                    self.selected_block = selected_block;
+                }
             }
         }
     }
@@ -131,9 +138,7 @@ impl App {
         let chunks =
             Layout::vertical([Constraint::Percentage(50), Constraint::Min(0)])
                 .split(area);
-        let block = self.selected_block.as_ref().expect(
-            "invariant violated: entered block view without selected block",
-        );
+        let block = &self.selected_block;
         let lines = vec![
             Line::from(vec![Span::styled(
                 format!("Block #{} {}", block.header.number, block.header.hash),

@@ -6,14 +6,14 @@ use alloy::{
         Signed, Transaction as TraitTransaction, TxEip1559, TxEip2930,
         TxEip4844, TxEip4844Variant, TxEnvelope, TxLegacy,
     },
-    hex::FromHex,
+    hex::{FromHex, FromHexError},
     primitives::{
         Address, BlockHash, Bytes, PrimitiveSignature, TxHash, TxKind, U256,
     },
     rpc::types::{eth::Header, Block, Transaction},
 };
 use eyre::{eyre, ErrReport};
-use log::{debug, error};
+use log::{debug, error, info};
 use r2d2::Pool;
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{params, Error, Params, Row};
@@ -74,7 +74,7 @@ impl Database {
     /// Retrieve the block [`Header`] with the highest timestamp (if it exists)
     pub fn latest_block_header(&self) -> eyre::Result<Option<Header>> {
         match self.conn_pool.get()?.query_row(
-            "SELECT * FROM block_headers ORDER BY inserted_at DESC",
+            "SELECT * FROM block_headers ORDER BY number DESC",
             [],
             |row| Ok(Self::row_to_header(row)),
         ) {
@@ -86,13 +86,25 @@ impl Database {
         }
     }
 
+    /// Retrieve the [`Block`] with the highest timestamp (if it exists)
+    pub fn latest_block(&self) -> eyre::Result<Option<Block>> {
+        match self.latest_block_header()? {
+            Some(latest_header) => self.block(latest_header.hash),
+            None => Ok(None),
+        }
+    }
+
     /// Retrieves the block [`Header`] with the given [`BlockHash`] (if it
     /// exists)
     pub fn header(&self, hash: BlockHash) -> eyre::Result<Option<Header>> {
-        debug!("Block header {} requested from database...", hash);
+        debug!(
+            "Block header {} requested from database...",
+            hash.to_string()
+        );
         match self.conn_pool.get()?.query_row(
-            "SELECT * FROM block_headers WHERE hash = ?",
-            [hash.to_string()],
+            format!("SELECT * FROM block_headers WHERE hash = '{}'", hash)
+                .as_str(),
+            [],
             |row| Ok(Self::row_to_header(row)),
         ) {
             Ok(t) => Ok(Some(t?)),
@@ -134,6 +146,20 @@ impl Database {
                 _ => Err(e.into()),
             },
         }
+    }
+
+    pub fn all_block_hashes(&self) -> eyre::Result<Vec<BlockHash>> {
+        let conn = self.conn_pool.get()?;
+        let mut stmt = conn.prepare("SELECT hash FROM block_headers")?;
+        let hash_strings: Vec<String> = stmt
+            .query_and_then([], |row| row.get::<&str, String>("hash"))?
+            .collect::<Result<Vec<String>, rusqlite::Error>>()?;
+        let hashes: Vec<BlockHash> = hash_strings
+            .iter()
+            .map(|s| s.parse())
+            .collect::<Result<Vec<BlockHash>, FromHexError>>(
+        )?;
+        Ok(hashes)
     }
 
     /// Retrieves all of the [`Transaction`]s associated with the [`Block`]
@@ -265,6 +291,7 @@ impl Database {
         self.add_transactions(
             block.transactions.clone().into_transactions().collect(),
         )?;
+        info!("Wrote block {} to the database", block.header.hash);
         Ok(())
     }
 
@@ -276,7 +303,7 @@ impl Database {
                     hash,
                     number,
                     parent_hash,
-                    ommer_hash,
+                    ommers_hash,
                     beneficiary,
                     state_root,
                     transactions_root,
@@ -348,7 +375,9 @@ impl Database {
                     .to_string(),
                 header.requests_hash.unwrap_or_default().to_string(),
             ],
-        )
+        )?;
+        debug!("Wrote block header {} to the database", header.hash);
+        Ok(())
     }
 
     fn transact_many<P>(
@@ -394,7 +423,7 @@ impl Database {
             hash STRING,
             number INTEGER,
             parent_hash STRING,
-            ommer_hash STRING,
+            ommers_hash STRING,
             beneficiary STRING,
             state_root STRING,
             transactions_root STRING,
@@ -545,49 +574,96 @@ impl Database {
     }
 
     fn row_to_header(row: &Row) -> eyre::Result<Header> {
-        Ok(Header::new(alloy::consensus::Header {
-            parent_hash: row.get::<usize, String>(3)?.parse()?,
-            ommers_hash: row.get::<usize, String>(4)?.parse()?,
-            beneficiary: row.get::<usize, String>(5)?.parse()?,
-            state_root: row.get::<usize, String>(6)?.parse()?,
-            transactions_root: row.get::<usize, String>(7)?.parse()?,
-            receipts_root: row.get::<usize, String>(8)?.parse()?,
-            logs_bloom: row.get::<usize, String>(9)?.parse()?,
-            difficulty: U256::from(row.get::<usize, u64>(10)?),
-            number: row.get::<usize, u64>(2)?,
-            gas_limit: row.get::<usize, u64>(11)?,
-            gas_used: row.get::<usize, u64>(12)?,
-            timestamp: row.get::<usize, u64>(13)?,
-            extra_data: row.get::<usize, Vec<u8>>(14)?.into(),
-            mix_hash: row.get::<usize, String>(15)?.parse()?,
-            nonce: row.get::<usize, String>(16)?.parse()?,
-            base_fee_per_gas: match row.get::<usize, u64>(17)? {
+        let mut header = Header::new(alloy::consensus::Header {
+            parent_hash: row.get::<&str, String>("parent_hash")?.parse()?,
+            ommers_hash: row.get::<&str, String>("ommers_hash")?.parse()?,
+            beneficiary: row.get::<&str, String>("beneficiary")?.parse()?,
+            state_root: row.get::<&str, String>("state_root")?.parse()?,
+            transactions_root: row
+                .get::<&str, String>("transactions_root")?
+                .parse()?,
+            receipts_root: row.get::<&str, String>("receipts_root")?.parse()?,
+            logs_bloom: row.get::<&str, String>("logs_bloom")?.parse()?,
+            difficulty: U256::from(row.get::<&str, u64>("difficulty")?),
+            number: row.get::<&str, u64>("number")?,
+            gas_limit: row.get::<&str, u64>("gas_limit")?,
+            gas_used: row.get::<&str, u64>("gas_used")?,
+            timestamp: row.get::<&str, u64>("timestamp")?,
+            extra_data: row.get::<&str, Vec<u8>>("extra_data")?.into(),
+            mix_hash: row.get::<&str, String>("mix_hash")?.parse()?,
+            nonce: row.get::<&str, String>("nonce")?.parse()?,
+            base_fee_per_gas: match row.get::<&str, u64>("base_fee_per_gas")? {
                 0 => None,
                 x => Some(x),
             },
-            withdrawals_root: match row.get::<usize, String>(18)?.as_str() {
-                "" => None,
-                x => Some(x.parse()?),
-            },
-            blob_gas_used: match row.get::<usize, u64>(19)? {
-                0 => None,
-                x => Some(x),
-            },
-            excess_blob_gas: match row.get::<usize, u64>(20)? {
-                0 => None,
-                x => Some(x),
-            },
-            parent_beacon_block_root: match row
-                .get::<usize, String>(21)?
+            withdrawals_root: match row
+                .get::<&str, String>("withdrawals_root")?
                 .as_str()
             {
                 "" => None,
                 x => Some(x.parse()?),
             },
-            requests_hash: match row.get::<usize, String>(22)?.as_str() {
+            blob_gas_used: match row.get::<&str, u64>("blob_gas_used")? {
+                0 => None,
+                x => Some(x),
+            },
+            excess_blob_gas: match row.get::<&str, u64>("excess_blob_gas")? {
+                0 => None,
+                x => Some(x),
+            },
+            parent_beacon_block_root: match row
+                .get::<&str, String>("parent_beacon_block_root")?
+                .as_str()
+            {
                 "" => None,
                 x => Some(x.parse()?),
             },
-        }))
+            requests_hash: match row
+                .get::<&str, String>("requests_hash")?
+                .as_str()
+            {
+                "" => None,
+                x => Some(x.parse()?),
+            },
+        });
+        header.hash = row.get::<&str, String>("hash")?.parse()?;
+        Ok(header)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_latest_block() {
+        let block = Block::default();
+        let creation_result = Database::new(Location::Memory);
+        assert!(creation_result.is_ok());
+        let db = creation_result.unwrap();
+        let insertion_result = db.add_block(&block);
+        assert!(insertion_result.is_ok());
+        let retrieval_result = db.latest_block();
+        assert!(retrieval_result.is_ok());
+        let perhaps_latest_block = retrieval_result.unwrap();
+        assert!(perhaps_latest_block.is_some());
+        let latest_block = perhaps_latest_block.unwrap();
+        assert_eq!(latest_block, block);
+    }
+
+    #[test]
+    fn test_latest_block_header() {
+        let header = Header::default();
+        let creation_result = Database::new(Location::Memory);
+        assert!(creation_result.is_ok());
+        let db = creation_result.unwrap();
+        let insertion_result = db.add_block_header(&header);
+        assert!(insertion_result.is_ok());
+        let retrieval_result = db.latest_block_header();
+        assert!(retrieval_result.is_ok());
+        let perhaps_latest_header = retrieval_result.unwrap();
+        assert!(perhaps_latest_header.is_some());
+        let latest_header = perhaps_latest_header.unwrap();
+        assert_eq!(latest_header, header);
     }
 }
