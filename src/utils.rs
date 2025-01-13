@@ -1,8 +1,11 @@
 //! Miscellaneous logic and types
 use std::fmt;
 
-use alloy::primitives::{Bytes, TxHash};
+use alloy::primitives::{Address, Bytes, TxHash, B256};
 use url::Url;
+
+const HASH_TRUNCATION_LEN: usize = 8;
+const ADDRESS_HEAD_TAIL_LEN: usize = 4;
 
 /// Represents the (public) identity of known block builders on Ethereum mainnet
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -105,4 +108,17 @@ pub fn etherscan_transaction_url(transaction_hash: TxHash) -> Url {
     format!("https://etherscan.io/tx/{transaction_hash}")
         .parse()
         .expect("invariant violated: constructed invalid transaction URL")
+}
+
+pub fn shorten_hash(hash: &B256) -> String {
+    format!("{}...", &hash.to_string()[0..HASH_TRUNCATION_LEN])
+}
+
+pub fn shorten_address(address: &Address) -> String {
+    let s = address.to_string();
+    format!(
+        "{}...{}",
+        &s[0..ADDRESS_HEAD_TAIL_LEN],
+        &s[s.len().saturating_sub(ADDRESS_HEAD_TAIL_LEN)..]
+    )
 }

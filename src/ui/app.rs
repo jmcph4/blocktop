@@ -1,4 +1,4 @@
-use alloy::rpc::types::Header;
+use alloy::{consensus::Transaction, rpc::types::Header};
 use chrono::{TimeZone, Utc};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -11,7 +11,7 @@ use ratatui::{
 
 use crate::{
     db::Database,
-    utils::{etherscan_block_url, BuilderIdentity},
+    utils::{self, etherscan_block_url, BuilderIdentity},
 };
 
 use super::components::stateful_list::StatefulList;
@@ -28,11 +28,12 @@ impl Default for View {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct App {
     pub title: String,
     pub should_quit: bool,
     pub block_headers: StatefulList<Header>,
+    pub transactions: StatefulList<alloy::rpc::types::eth::Transaction>,
     pub view: View,
     pub selected_block: alloy::rpc::types::Block,
 }
@@ -45,7 +46,10 @@ impl App {
         Self {
             title,
             selected_block,
-            ..Self::default()
+            block_headers: StatefulList::with_items(vec![]),
+            transactions: StatefulList::with_items(vec![]),
+            should_quit: false,
+            view: View::default(),
         }
     }
 
@@ -81,11 +85,17 @@ impl App {
     }
 
     pub fn on_up(&mut self) {
-        self.block_headers.previous();
+        match self.view {
+            View::Default => self.block_headers.previous(),
+            View::Block => self.transactions.previous(),
+        }
     }
 
     pub fn on_down(&mut self) {
-        self.block_headers.next();
+        match self.view {
+            View::Default => self.block_headers.next(),
+            View::Block => self.transactions.next(),
+        }
     }
 
     pub fn on_tick(&mut self, db: &Database) {
@@ -105,6 +115,14 @@ impl App {
                 {
                     self.selected_block = selected_block;
                 }
+            } else {
+                self.transactions = StatefulList::with_items(
+                    self.selected_block
+                        .transactions
+                        .clone()
+                        .into_transactions()
+                        .collect(),
+                );
             }
         }
     }
@@ -163,13 +181,7 @@ impl App {
         ];
         let block_header_text = Paragraph::new(Text::from(lines));
         frame.render_widget(block_header_text, chunks[0]);
-
-        let transaction_list = List::new(
-            block.transactions.clone().into_transactions().map(|tx| {
-                ListItem::from(format!("{}", tx.transaction_index.unwrap()))
-            }),
-        );
-        frame.render_widget(transaction_list, chunks[1]);
+        self.draw_transactions_list(frame, chunks[1]);
     }
 
     fn draw_latest_blocks_list(&mut self, frame: &mut Frame, area: Rect) {
@@ -223,6 +235,58 @@ impl App {
             latest_blocks_list,
             area,
             &mut self.block_headers.state,
+        );
+    }
+
+    fn draw_transactions_list(&mut self, frame: &mut Frame, area: Rect) {
+        let transactions: Vec<ListItem> = self
+            .selected_block
+            .transactions
+            .clone()
+            .into_transactions()
+            .map(|tx| {
+                let tx_info = tx.info();
+                ListItem::new(vec![Line::from(vec![
+                    Span::styled(
+                        format!("{:<4}", tx_info.index.unwrap().to_string()),
+                        Style::new().bold(),
+                    ),
+                    Span::raw(format!(
+                        "{:<20}",
+                        format!(
+                            "{}",
+                            utils::shorten_hash(&tx_info.hash.unwrap())
+                        )
+                    )),
+                    Span::raw(format!(
+                        "{:<20}",
+                        utils::shorten_address(&tx.from)
+                    )),
+                    Span::raw(format!(
+                        "{:<20}",
+                        utils::shorten_address(&tx.to().unwrap_or_default())
+                    )),
+                    Span::raw(format!("{:<20}", tx.nonce())),
+                    Span::raw(if tx.to().is_none() {
+                        "📄".to_string()
+                    } else {
+                        "".to_string()
+                    }),
+                ])])
+            })
+            .collect();
+        let transactions_list = List::new(transactions)
+            .block(
+                Block::bordered()
+                    .title(Line::from("Transactions").centered())
+                    .border_style(Color::Green),
+            )
+            .highlight_style(Style::default().bg(Color::Magenta))
+            .highlight_symbol("> ");
+        frame.render_stateful_widget(
+            transactions_list,
+            area,
+            &mut self.transactions.state,
         );
     }
 

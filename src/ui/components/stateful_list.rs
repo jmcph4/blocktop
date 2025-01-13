@@ -7,6 +7,13 @@ pub struct StatefulList<T> {
 }
 
 impl<T> StatefulList<T> {
+    pub fn with_items(items: Vec<T>) -> Self {
+        Self {
+            state: ListState::default(),
+            items,
+        }
+    }
+
     pub fn next(&mut self) {
         let i = match self.state.selected() {
             Some(i) => {
