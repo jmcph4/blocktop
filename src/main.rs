@@ -17,6 +17,7 @@ pub mod ui;
 pub mod utils;
 
 /// Retrieve an initial block from the endpoint so that upon UI startup there's data to render
+#[allow(clippy::needless_question_mark)] /* clippy gets this wrong */
 async fn populate_db(opts: &Opts, db: &mut Database) -> eyre::Result<()> {
     Ok(db.add_block(
         &AnyClient::new(opts.rpc.clone())

@@ -167,6 +167,7 @@ impl Database {
     ///
     /// If there are no such transactions in the database, the returned vector
     /// is guaranteed to have a length of zero.
+    #[allow(clippy::let_and_return)] /* clippy gets this wrong */
     pub fn transactions_by_block(
         &self,
         hash: BlockHash,
@@ -499,7 +500,7 @@ impl Database {
                         t => TxKind::Call(t),
                     },
                     value,
-                    input: input,
+                    input,
                 },
                 PrimitiveSignature::test_signature(),
                 hash,
@@ -516,7 +517,7 @@ impl Database {
                     },
                     value,
                     access_list: vec![].into(), /* TODO(jmcph4): support access lists */
-                    input: input,
+                    input,
                 },
                 PrimitiveSignature::test_signature(),
                 hash,
@@ -536,7 +537,7 @@ impl Database {
                     },
                     value,
                     access_list: vec![].into(), /* TODO(jmcph4): support access lists */
-                    input: input,
+                    input,
                 },
                 PrimitiveSignature::test_signature(),
                 hash,
@@ -555,7 +556,7 @@ impl Database {
                     access_list: vec![].into(), /* TODO(jmcph4): support access lists */
                     blob_versioned_hashes: vec![],
                     max_fee_per_blob_gas: 0,
-                    input: input,
+                    input,
                 }),
                 PrimitiveSignature::test_signature(),
                 hash,
