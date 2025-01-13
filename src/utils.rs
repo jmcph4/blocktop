@@ -121,7 +121,7 @@ pub fn shorten_address(address: &Address) -> String {
     let s = address.to_string();
     format!(
         "{}...{}",
-        &s[0..ADDRESS_HEAD_TAIL_LEN],
+        &s[0..ADDRESS_HEAD_TAIL_LEN+2],
         &s[s.len().saturating_sub(ADDRESS_HEAD_TAIL_LEN)..]
     )
 }
