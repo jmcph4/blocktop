@@ -1,5 +1,8 @@
 //! Miscellaneous logic and types
-use std::fmt;
+use std::{
+    fmt,
+    time::{Duration, SystemTime},
+};
 
 use alloy::primitives::{Address, Bytes, TxHash, B256};
 use url::Url;
@@ -121,4 +124,11 @@ pub fn shorten_address(address: &Address) -> String {
         &s[0..ADDRESS_HEAD_TAIL_LEN],
         &s[s.len().saturating_sub(ADDRESS_HEAD_TAIL_LEN)..]
     )
+}
+
+pub fn duration_since_timestamp(timestamp: u64) -> Duration {
+    let now = SystemTime::now();
+    let unix_epoch = SystemTime::UNIX_EPOCH;
+    let timestamp_time = unix_epoch + Duration::from_secs(timestamp);
+    now.duration_since(timestamp_time).unwrap()
 }

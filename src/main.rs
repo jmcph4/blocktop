@@ -39,6 +39,12 @@ fn main() -> eyre::Result<()> {
         None => Location::Memory,
     })?;
 
+    if opts.list_block_hashes {
+        db.all_block_hashes()?
+            .iter()
+            .for_each(|hash| println!("{hash}"));
+    }
+
     /* wet the database */
     tokio::task::block_in_place(|| {
         tokio::runtime::Runtime::new()

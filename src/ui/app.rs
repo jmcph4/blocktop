@@ -178,7 +178,7 @@ impl App {
                 format!("Block #{} {}", block.header.number, block.header.hash),
                 Style::default().bold(),
             )]),
-            Line::from(vec![Span::raw(format!("Timestamp: {}", Utc.timestamp_opt(block.header.timestamp as i64, 0).unwrap()))]),
+            Line::from(vec![Span::raw(format!("Timestamp: {} ({})", Utc.timestamp_opt(block.header.timestamp as i64, 0).unwrap(), timeago::Formatter::new().convert(utils::duration_since_timestamp(block.header.timestamp))))]),
             Line::from(vec![Span::raw(format!(
                 "Gas Usage (wei): {}  / {} ({:.2}%)        Base Fee (gwei): {:.3}",
                 block.header.gas_used,

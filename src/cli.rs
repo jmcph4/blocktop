@@ -11,4 +11,6 @@ pub struct Opts {
     pub db: Option<PathBuf>,
     #[clap(long, action)]
     pub headless: bool,
+    #[clap(long, action)]
+    pub list_block_hashes: bool,
 }
