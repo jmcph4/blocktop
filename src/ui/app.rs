@@ -136,7 +136,7 @@ impl App {
 
     fn draw_block_view(&mut self, frame: &mut Frame, area: Rect) {
         let chunks =
-            Layout::vertical([Constraint::Percentage(50), Constraint::Min(0)])
+            Layout::vertical([Constraint::Percentage(20), Constraint::Min(0)])
                 .split(area);
         let block = &self.selected_block;
         let lines = vec![
