@@ -1,4 +1,7 @@
-use alloy::{consensus::Transaction, rpc::types::Header};
+use alloy::{
+    consensus::Transaction as AbstractTransaction,
+    rpc::types::{Header, Transaction},
+};
 use chrono::{TimeZone, Utc};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -79,8 +82,21 @@ impl App {
     }
 
     pub fn on_enter(&mut self) {
-        if self.get_selected().is_some() {
+        if self.get_selected_header().is_some() {
             self.view = View::Block;
+        }
+
+        match self.view {
+            View::Default => {
+                if self.get_selected_header().is_some() {
+                    self.view = View::Block
+                }
+            }
+            View::Block => {
+                if self.get_selected_transaction().is_some() {
+                    todo!()
+                }
+            }
         }
     }
 
@@ -108,21 +124,20 @@ impl App {
             self.block_headers.items.push(latest_header.clone());
         }
 
-        if let Some(selected_header) = self.get_selected() {
+        if let Some(selected_header) = self.get_selected_header() {
             if !matches!(self.view, View::Block) {
                 if let Some(selected_block) =
                     db.block(selected_header.hash).unwrap()
                 {
                     self.selected_block = selected_block;
+                    self.transactions = StatefulList::with_items(
+                        self.selected_block
+                            .transactions
+                            .clone()
+                            .into_transactions()
+                            .collect(),
+                    );
                 }
-            } else {
-                self.transactions = StatefulList::with_items(
-                    self.selected_block
-                        .transactions
-                        .clone()
-                        .into_transactions()
-                        .collect(),
-                );
             }
         }
     }
@@ -334,10 +349,17 @@ impl App {
         xs.clone()
     }
 
-    fn get_selected(&self) -> Option<&Header> {
+    fn get_selected_header(&self) -> Option<&Header> {
         self.block_headers
             .state
             .selected()
             .and_then(|offset| self.block_headers.items.get(offset))
+    }
+
+    fn get_selected_transaction(&self) -> Option<&Transaction> {
+        self.transactions
+            .state
+            .selected()
+            .and_then(|offset| self.transactions.items.get(offset))
     }
 }
