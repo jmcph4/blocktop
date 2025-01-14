@@ -4,7 +4,11 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-use alloy::primitives::{Address, Bytes, TxHash, B256};
+use alloy::{
+    consensus::Transaction as AbstractTransaction,
+    primitives::{Address, Bytes, TxHash, B256},
+    rpc::types::Transaction,
+};
 use url::Url;
 
 const HASH_TRUNCATION_LEN: usize = 8;
@@ -121,7 +125,7 @@ pub fn shorten_address(address: &Address) -> String {
     let s = address.to_string();
     format!(
         "{}...{}",
-        &s[0..ADDRESS_HEAD_TAIL_LEN+2],
+        &s[0..ADDRESS_HEAD_TAIL_LEN + 2],
         &s[s.len().saturating_sub(ADDRESS_HEAD_TAIL_LEN)..]
     )
 }
@@ -131,4 +135,26 @@ pub fn duration_since_timestamp(timestamp: u64) -> Duration {
     let unix_epoch = SystemTime::UNIX_EPOCH;
     let timestamp_time = unix_epoch + Duration::from_secs(timestamp);
     now.duration_since(timestamp_time).unwrap()
+}
+
+pub fn human_readable_tx_data(data: Bytes) -> String {
+    let buflen = data.len();
+
+    if buflen == 0 {
+        "∅".to_string()
+    } else if buflen > 10 {
+        format!("{}...", &data.to_string()[0..10])
+    } else {
+        data.to_string().to_string()
+    }
+}
+
+#[inline]
+pub fn to_gwei(x: f64) -> f64 {
+    x / f64::powi(10.0, 9)
+}
+
+#[inline]
+pub fn useful_gas_price(tx: &Transaction) -> u128 {
+    tx.max_fee_per_gas()
 }

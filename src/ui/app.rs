@@ -14,7 +14,9 @@ use ratatui::{
 
 use crate::{
     db::Database,
-    utils::{self, etherscan_block_url, BuilderIdentity},
+    utils::{
+        self, etherscan_block_url, to_gwei, useful_gas_price, BuilderIdentity,
+    },
 };
 
 use super::components::stateful_list::StatefulList;
@@ -184,8 +186,7 @@ impl App {
                 block.header.gas_used,
                 block.header.gas_limit,
                 (block.header.gas_used as f64) / (block.header.gas_limit as f64) * 100.0,
-                block.header.base_fee_per_gas.unwrap_or_default() as f64
-                    / f64::powi(10.0, 9)
+                to_gwei(block.header.base_fee_per_gas.unwrap_or_default() as f64)
             ))]),
             Line::from(vec![Span::raw(
                 match BuilderIdentity::from(block.header.extra_data.clone()) {
@@ -215,8 +216,10 @@ impl App {
                         "{:<20}",
                         format!(
                             "{:.3} gwei",
-                            header.base_fee_per_gas.unwrap_or_default() as f64
-                                / f64::powi(10.0, 9)
+                            to_gwei(
+                                header.base_fee_per_gas.unwrap_or_default()
+                                    as f64
+                            )
                         )
                     )),
                     Span::raw(format!("{:<20}", header.gas_used)),
@@ -268,26 +271,40 @@ impl App {
                         Style::new().bold(),
                     ),
                     Span::raw(format!(
-                        "{:<20}",
+                        "{:<16}",
                         format!(
                             "{}",
                             utils::shorten_hash(&tx_info.hash.unwrap())
                         )
                     )),
                     Span::raw(format!(
-                        "{:<20}",
+                        "{:<16}",
                         utils::shorten_address(&tx.from)
                     )),
                     Span::raw(format!(
-                        "{:<20}",
+                        "{:<16}",
                         utils::shorten_address(&tx.to().unwrap_or_default())
                     )),
-                    Span::raw(format!("{:<20}", tx.nonce())),
-                    Span::raw(if tx.to().is_none() {
-                        "📄".to_string()
-                    } else {
-                        "".to_string()
-                    }),
+                    Span::raw(format!("{:<8}", tx.nonce())),
+                    Span::raw(format!(
+                        "{:<4}",
+                        if tx.to().is_none() {
+                            "📄".to_string()
+                        } else {
+                            "".to_string()
+                        }
+                    )),
+                    Span::raw(format!(
+                        "{:<20}",
+                        utils::human_readable_tx_data(tx.input().clone(),)
+                    )),
+                    Span::raw(format!(
+                        "{:<20}",
+                        format!(
+                            "{:.3} gwei",
+                            to_gwei(useful_gas_price(&tx) as f64),
+                        )
+                    )),
                 ])])
             })
             .collect();
