@@ -172,6 +172,12 @@ impl App {
                 }
             }
         }
+
+        if let Some(selected_tx) = self.get_selected_transaction() {
+            if !matches!(self.view, View::Transaction) {
+                self.selected_transaction = selected_tx.clone();
+            }
+        }
     }
 
     pub fn draw(&mut self, frame: &mut Frame) {
