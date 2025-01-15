@@ -4,7 +4,7 @@
 
 Submit all vulnerabilities to:
 
-![https://jmcph4.dev/assets/images/email.png]
+![email](https://jmcph4.dev/assets/images/email.png)
 
 ## Security Considerations ##
 
