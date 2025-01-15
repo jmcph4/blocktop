@@ -24,6 +24,8 @@ Options:
   -h, --help               Print help
 ```
 
+At the moment, `blocktop` only supports Websockets or Unix domain sockets as transports for RPC communication. `blocktop` makes use of the [free Ethereum RPC service provided by Merkle](https://merkle.io/free-eth-rpc) by default.
+
 ### TUI Mode ###
 
 The default invocation (i.e., `blocktop`) will open the TUI and start retrieving data from the default Ethereum RPC node using an in-memory SQLite database.
