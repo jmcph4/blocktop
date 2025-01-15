@@ -1,5 +1,7 @@
 # blocktop #
 
+TODO: embed demo
+
 Minimalist TUI block explorer for Ethereum networks.
 
  - Gain rapid insights into chain health by viewing new canonical blocks live in a visually clear, low-latency manner
@@ -15,35 +17,45 @@ $ blocktop -h
 Usage: blocktop [OPTIONS]
 
 Options:
-  -r, --rpc <RPC>  [default: wss://eth.merkle.io]
-  -d, --db <DB>    
-      --headless   
-  -h, --help       Print help
+  -r, --rpc <RPC>          [default: wss://eth.merkle.io]
+  -d, --db <DB>            
+      --headless           
+      --list-block-hashes  
+  -h, --help               Print help
 ```
 
-### Default Invocation ###
+### TUI Mode ###
 
 The default invocation (i.e., `blocktop`) will open the TUI and start retrieving data from the default Ethereum RPC node using an in-memory SQLite database.
 
+TODO: insert screenshot
+
+#### Controls ####
+
+| Key | Action |
+| --- | --- |
+| `j`, `k`, `Up`, `Down` | Scrolls lists | 
+| `e` | In block or transaction view, opens the block or transaction in [Etherscan](https://etherscan.io), respectively |
+| `q` | Exits the application |
+| `Esc` | Returns to the previous page or exits the application if on the main page |
+
 ### Headless Mode ###
 
-To invoke solely the indexer without the TUI frontend, specify the `--headless` flag. This mode is the most useful with the `RUST_LOG` environment variable configured to either `info` or `debug`:
+To invoke solely the indexer without the TUI frontend, specify the `--headless` flag. This mode is the most useful with the `RUST_LOG` environment variable configured to `info`:
 
 ```
-$ RUST_LOG=debug blocktop --headless
- 2025-01-09T11:11:50.215Z WARN  blocktop > Headless mode without specifying an on-disk database. All data will be lost on exit.
- 2025-01-09T11:11:52.661Z DEBUG tungstenite::handshake::client > Client handshake done.
- 2025-01-09T11:11:55.159Z INFO  blocktop::client               > Websockets client initialised (endpoint: wss://eth.merkle.io/, chain: 1)
- 2025-01-09T11:11:55.159Z DEBUG blocktop::client               > Subscribing to block header stream...
- 2025-01-09T11:12:06.329Z DEBUG blocktop::services::blockchain > Saved header: 0xf951b93211d58182790f7d116643885c85a497411781361d9214ff0853473c93
- 2025-01-09T11:12:06.329Z DEBUG blocktop::client               > Subscribing to block header stream...
- 2025-01-09T11:12:17.804Z DEBUG blocktop::services::blockchain > Saved header: 0x47f76ce9be6b1985da8af06498f436bae59c8f9feb226f7ad6eabd22bc0585f6
- 2025-01-09T11:12:17.804Z DEBUG blocktop::client               > Subscribing to block header stream...
+$ RUST_LOG=info blocktop --headless
+ 2025-01-15T05:13:06.017Z INFO  blocktop::client > Websockets client initialised (endpoint: wss://eth.merkle.io/, chain: 1)
+ 2025-01-15T05:13:06.806Z INFO  blocktop::db     > Wrote block 0x2d21b100f838bb2656bcd0599cbdc30048d6d1a694581c6ec781e8f58961c729 to the database
+ 2025-01-15T05:13:08.077Z INFO  blocktop::client > Websockets client initialised (endpoint: wss://eth.merkle.io/, chain: 1)
+ 2025-01-15T05:13:19.203Z INFO  blocktop::db     > Wrote block 0x5850d0c1ba90da1cfe682ad29a727b841038ead07e198477869550cbb387f053 to the database
+ 2025-01-15T05:13:26.187Z INFO  blocktop::db     > Wrote block 0x52a43747e20465e7407ccba6915a027457220e06399ab992409b3ace66e40301 to the database
+ 2025-01-15T05:13:39.812Z INFO  blocktop::db     > Wrote block 0xf31df89a9277295916f714d78a3ccf708826951a7a6e0ac40563b18a51d14f76 to the database
 ```
 
 As the warning-level log line at the start of the output indicates, headless operation also benefits from specifying an on-disk database to save chain state to:
 
 ```
-$ RUST_LOG=debug blocktop --headless --db foobar.db
+$ RUST_LOG=info blocktop --headless --db foobar.db
 ```
 
