@@ -3,6 +3,14 @@ name = "blocktop"
 version = "0.1.0"
 edition = "2021"
 
+authors = ["Jack McPherson <jack@jmcph4.dev>"]
+license-file = "LICENSE"
+description = "A minimalist TUI block explorer for Ethereum blockchains"
+repository = "https://github.com/jmcph4/blocktop"
+readme = "README.md"
+keywords = ["blockchain", "ethereum", "cryptocurrency"]
+categories = ["cryptography::cryptocurrencies", "development-tools"]
+
 [dependencies]
 alloy = { version = "0.9.1", features = ["provider-ws", "rpc-types-eth", "provider-ipc"] }
 chrono = "0.4.39"
