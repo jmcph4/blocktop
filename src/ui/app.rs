@@ -1,5 +1,6 @@
 use alloy::{
     consensus::Transaction as AbstractTransaction,
+    primitives::{Address, Bytes},
     rpc::types::{Header, Transaction},
 };
 use chrono::{TimeZone, Utc};
@@ -8,14 +9,17 @@ use ratatui::{
     style::{Color, Style, Stylize},
     symbols,
     text::{Line, Span, Text},
-    widgets::{Bar, BarChart, BarGroup, Block, List, ListItem, Paragraph},
+    widgets::{
+        Bar, BarChart, BarGroup, Block, List, ListItem, Paragraph, Wrap,
+    },
     Frame,
 };
 
 use crate::{
     db::Database,
     utils::{
-        self, etherscan_block_url, to_gwei, useful_gas_price, BuilderIdentity,
+        self, etherscan_block_url, etherscan_transaction_url, to_ether,
+        to_gwei, useful_gas_price, BuilderIdentity,
     },
 };
 
@@ -25,6 +29,7 @@ use super::components::stateful_list::StatefulList;
 pub enum View {
     Default,
     Block,
+    Transaction,
 }
 
 impl Default for View {
@@ -41,16 +46,19 @@ pub struct App {
     pub transactions: StatefulList<alloy::rpc::types::eth::Transaction>,
     pub view: View,
     pub selected_block: alloy::rpc::types::Block,
+    pub selected_transaction: alloy::rpc::types::Transaction,
 }
 
 impl App {
     pub fn new(
         title: String,
         selected_block: alloy::rpc::types::Block,
+        selected_transaction: alloy::rpc::types::Transaction,
     ) -> Self {
         Self {
             title,
             selected_block,
+            selected_transaction,
             block_headers: StatefulList::with_items(vec![]),
             transactions: StatefulList::with_items(vec![]),
             should_quit: false,
@@ -61,7 +69,8 @@ impl App {
     pub fn on_esc(&mut self) {
         match self.view {
             View::Default => self.should_quit = true,
-            _ => self.view = View::Default,
+            View::Block => self.view = View::Default,
+            View::Transaction => self.view = View::Block,
         }
     }
 
@@ -70,16 +79,34 @@ impl App {
             self.should_quit = true;
         }
 
-        if let View::Block = self.view {
-            if c == 'e' {
-                webbrowser::open(
-                    etherscan_block_url(
-                        self.selected_block.clone().header.number,
+        match self.view {
+            View::Block => {
+                if c == 'e' {
+                    webbrowser::open(
+                        etherscan_block_url(
+                            self.selected_block.clone().header.number,
+                        )
+                        .as_str(),
                     )
-                    .as_str(),
-                )
-                .unwrap()
+                    .unwrap()
+                }
             }
+            View::Transaction => {
+                if c == 'e' {
+                    webbrowser::open(
+                        etherscan_transaction_url(
+                            self.selected_transaction
+                                .clone()
+                                .info()
+                                .hash
+                                .unwrap(),
+                        )
+                        .as_str(),
+                    )
+                    .unwrap()
+                }
+            }
+            _ => {}
         }
     }
 
@@ -96,9 +123,10 @@ impl App {
             }
             View::Block => {
                 if self.get_selected_transaction().is_some() {
-                    todo!()
+                    self.view = View::Transaction
                 }
             }
+            _ => {}
         }
     }
 
@@ -106,6 +134,7 @@ impl App {
         match self.view {
             View::Default => self.block_headers.previous(),
             View::Block => self.transactions.previous(),
+            View::Transaction => {}
         }
     }
 
@@ -113,6 +142,7 @@ impl App {
         match self.view {
             View::Default => self.block_headers.next(),
             View::Block => self.transactions.next(),
+            View::Transaction => {}
         }
     }
 
@@ -167,7 +197,63 @@ impl App {
                 .split(frame.area());
                 self.draw_block_view(frame, chunks[1]);
             }
+            View::Transaction => {
+                let chunks = Layout::vertical([
+                    Constraint::Length(1),
+                    Constraint::Min(0),
+                ])
+                .margin(1)
+                .split(frame.area());
+                self.draw_transaction_view(frame, chunks[1]);
+            }
         }
+    }
+
+    fn draw_transaction_view(&mut self, frame: &mut Frame, area: Rect) {
+        self.draw_transaction_header_text(frame, area);
+    }
+
+    fn draw_transaction_header_text(&mut self, frame: &mut Frame, area: Rect) {
+        let tx = self.selected_transaction.clone();
+        let timestamp = self.selected_block.header.timestamp;
+
+        let chunks =
+            Layout::vertical([Constraint::Percentage(20), Constraint::Min(0)])
+                .split(area);
+
+        let lines = vec![
+            Line::from(Span::styled(
+                format!("Transaction {}", tx.info().hash.unwrap()),
+                Style::new().bold(),
+            )),
+            Line::from(vec![
+                Span::styled("Timestamp: ", Style::new().bold()),
+                Span::raw(format!(
+                    "{} ({})",
+                    Utc.timestamp_opt(timestamp as i64, 0).unwrap(),
+                    timeago::Formatter::new()
+                        .convert(utils::duration_since_timestamp(timestamp))
+                )),
+            ]),
+            Line::from(vec![
+                Span::styled("From: ", Style::new().bold()),
+                Span::raw(format!("{}", tx.from)),
+            ]),
+            Line::from(vec![
+                Span::styled("To:   ", Style::new().bold()),
+                match tx.to() {
+                    Some(addr) => Span::raw(format!("{}", addr)),
+                    None => Span::raw(format!("{} (CREATE)", Address::ZERO)),
+                },
+            ]),
+            Line::from(vec![
+                Span::styled("", Style::new().bold()),
+                Span::raw(format!("{} Ether", to_ether(tx.value()))),
+            ]),
+        ];
+        let transaction_header_text = Paragraph::new(Text::from(lines));
+        frame.render_widget(transaction_header_text, chunks[0]);
+        self.draw_hex_display(tx.input(), frame, chunks[1]);
     }
 
     fn draw_block_view(&mut self, frame: &mut Frame, area: Rect) {
@@ -405,6 +491,18 @@ impl App {
             .collect();
         xs = xs.clone().bars(&bars[..]);
         xs.clone()
+    }
+
+    fn draw_hex_display(
+        &mut self,
+        bytes: &Bytes,
+        frame: &mut Frame,
+        area: Rect,
+    ) {
+        frame.render_widget(
+            Paragraph::new(format!("{}", bytes)).wrap(Wrap { trim: true }),
+            area,
+        );
     }
 
     fn get_selected_header(&self) -> Option<&Header> {

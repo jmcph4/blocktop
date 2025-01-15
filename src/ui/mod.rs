@@ -13,12 +13,18 @@ const TICK_MILLIS: u64 = 250; /* 250ms */
 
 /// Drives the TUI app
 pub fn run(mut terminal: DefaultTerminal, db: &Database) -> eyre::Result<()> {
-    let mut app = App::new(
-        "blocktop".to_string(),
-        db.latest_block()?.expect(
-            "invariant violated: database must always have at least one block",
-        ),
+    /* we're able to wet the UI with selected chain objects due to wetting the
+     * database on startup */
+    let latest_block = db.latest_block()?.expect(
+        "invariant violated: database must always have at least one block",
     );
+    let latest_tx = latest_block
+        .clone()
+        .transactions
+        .into_transactions()
+        .next()
+        .expect("invariant violated: latest block must be non-empty");
+    let mut app = App::new("blocktop".to_string(), latest_block, latest_tx);
     let tick_rate: Duration = Duration::from_millis(TICK_MILLIS);
     let mut last_tick = Instant::now();
 

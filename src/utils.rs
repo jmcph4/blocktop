@@ -6,7 +6,7 @@ use std::{
 
 use alloy::{
     consensus::Transaction as AbstractTransaction,
-    primitives::{Address, Bytes, TxHash, B256},
+    primitives::{Address, Bytes, TxHash, B256, U256},
     rpc::types::Transaction,
 };
 use url::Url;
@@ -152,6 +152,21 @@ pub fn human_readable_tx_data(data: Bytes) -> String {
 #[inline]
 pub fn to_gwei(x: f64) -> f64 {
     x / f64::powi(10.0, 9)
+}
+
+#[inline]
+pub fn to_ether(x: U256) -> f64 {
+    if x > U256::from(u128::MAX) {
+        todo!()
+    } else {
+        u128::from_be_bytes(
+            x.to_be_bytes_vec()[0..((u128::BITS / 8) as usize)]
+                .try_into()
+                .expect(
+                    "invariant violated: U256 must have enough bytes for u128",
+                ),
+        ) as f64
+    }
 }
 
 #[inline]
