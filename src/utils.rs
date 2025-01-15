@@ -1,6 +1,7 @@
 //! Miscellaneous logic and types
 use std::{
     fmt,
+    str::FromStr,
     time::{Duration, SystemTime},
 };
 
@@ -13,6 +14,38 @@ use url::Url;
 
 const HASH_TRUNCATION_LEN: usize = 8;
 const ADDRESS_HEAD_TAIL_LEN: usize = 4;
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum BuilderNetIdentity {
+    Flashbots,
+    Nethermind,
+    Beaver,
+}
+
+impl fmt::Display for BuilderNetIdentity {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Flashbots => write!(f, "Flashbots"),
+            Self::Nethermind => write!(f, "Nethermind"),
+            Self::Beaver => write!(f, "Beaver"),
+        }
+    }
+}
+
+impl FromStr for BuilderNetIdentity {
+    type Err = &'static str;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "BuilderNet (Flashbots)" | "Illuminate Dmocrtz Dstrib Prtct" => {
+                Ok(Self::Flashbots)
+            }
+            "BuilderNet (Nethermind)" => Ok(Self::Nethermind),
+            "BuilderNet (Beaverbuild)" => Ok(Self::Beaver),
+            _ => Err("Unknown BuilderNet operator"),
+        }
+    }
+}
 
 /// Represents the (public) identity of known block builders on Ethereum mainnet
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -35,6 +68,7 @@ pub enum BuilderIdentity {
     Bitget,
     Btcs,
     Local,
+    BuilderNet(BuilderNetIdentity),
 }
 
 impl fmt::Display for BuilderIdentity {
@@ -58,6 +92,7 @@ impl fmt::Display for BuilderIdentity {
             Self::Bitget => write!(f, "Bitget"),
             Self::Btcs => write!(f, "Builder+"),
             Self::Local => write!(f, "<local>"),
+            Self::BuilderNet(t) => write!(f, "BuilderNet - {}", t),
         }
     }
 }
@@ -87,7 +122,13 @@ impl From<Vec<u8>> for BuilderIdentity {
                 "Manifold: coinbase" => Self::Manifold,
                 "Bitget(https://www.bitget.com/)" => Self::Bitget,
                 "Builder+ www.btcs.com/builder" => Self::Btcs,
-                _ => Self::Local,
+                s => {
+                    if let Ok(op) = BuilderNetIdentity::from_str(s) {
+                        Self::BuilderNet(op)
+                    } else {
+                        Self::Local
+                    }
+                }
             }
         } else {
             Self::Local
