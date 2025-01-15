@@ -28,8 +28,11 @@ async fn populate_db(opts: &Opts, db: &mut Database) -> eyre::Result<()> {
 }
 
 fn main() -> eyre::Result<()> {
-    pretty_env_logger::init_timed();
     let opts: Opts = Opts::parse();
+
+    if opts.headless {
+        pretty_env_logger::init_timed();
+    }
 
     if opts.headless && opts.db.is_none() {
         warn!("Headless mode without specifying an on-disk database. All data will be lost on exit.");
