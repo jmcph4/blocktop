@@ -174,31 +174,71 @@ impl App {
         let chunks =
             Layout::vertical([Constraint::Percentage(20), Constraint::Min(0)])
                 .split(area);
+        self.draw_block_header_text(frame, chunks[0]);
+        self.draw_transactions_list(frame, chunks[1]);
+    }
+
+    fn draw_block_header_text(&mut self, frame: &mut Frame, area: Rect) {
         let block = &self.selected_block;
         let lines = vec![
             Line::from(vec![Span::styled(
                 format!("Block #{} {}", block.header.number, block.header.hash),
                 Style::default().bold(),
             )]),
-            Line::from(vec![Span::raw(format!("Timestamp: {} ({})", Utc.timestamp_opt(block.header.timestamp as i64, 0).unwrap(), timeago::Formatter::new().convert(utils::duration_since_timestamp(block.header.timestamp))))]),
+            Line::from(vec![
+                Span::styled("Timestamp: ", Style::new().bold()),
+                Span::raw(format!(
+                    "{} ({})",
+                    Utc.timestamp_opt(block.header.timestamp as i64, 0)
+                        .unwrap(),
+                    timeago::Formatter::new().convert(
+                        utils::duration_since_timestamp(block.header.timestamp)
+                    )
+                )),
+            ]),
+            Line::from(vec![
+                Span::styled("Gas Usage (wei): ", Style::new().bold()),
+                Span::raw(format!(
+                    "{}  / {} ({:.2}%)",
+                    block.header.gas_used,
+                    block.header.gas_limit,
+                    (block.header.gas_used as f64)
+                        / (block.header.gas_limit as f64)
+                        * 100.0
+                )),
+                Span::styled("        Base Fee (gwei): ", Style::new().bold()),
+                Span::raw(format!(
+                    " {:.3}",
+                    to_gwei(block.header.base_fee_per_gas.unwrap_or_default()
+                        as f64)
+                )),
+            ]),
+            Line::from(vec![
+                Span::styled("Beneficiary: ", Style::new().bold()),
+                Span::raw(
+                    match BuilderIdentity::from(block.header.extra_data.clone())
+                    {
+                        BuilderIdentity::Local => format!(
+                            "{} (locally built)",
+                            block.header.beneficiary
+                        ),
+                        iden => {
+                            format!("{} ({})", block.header.beneficiary, iden)
+                        }
+                    },
+                ),
+            ]),
+            Line::from(vec![
+                Span::styled("State Root: ", Style::new().bold()),
+                Span::raw(format!("{}", block.header.state_root)),
+            ]),
             Line::from(vec![Span::raw(format!(
-                "Gas Usage (wei): {}  / {} ({:.2}%)        Base Fee (gwei): {:.3}",
-                block.header.gas_used,
-                block.header.gas_limit,
-                (block.header.gas_used as f64) / (block.header.gas_limit as f64) * 100.0,
-                to_gwei(block.header.base_fee_per_gas.unwrap_or_default() as f64)
+                "Contains {} transactions",
+                block.transactions.len()
             ))]),
-            Line::from(vec![Span::raw(
-                match BuilderIdentity::from(block.header.extra_data.clone()) {
-                    BuilderIdentity::Local => format!("Beneficiary: {} (locally built)", block.header.beneficiary),
-                    iden => format!("Beneficiary: {} ({})", block.header.beneficiary, iden),
-                })]),
-                Line::from(vec![Span::raw(format!("State Root: {}", block.header.state_root))]),
-                Line::from(vec![Span::raw(format!("Contains {} transactions", block.transactions.len()))])
         ];
         let block_header_text = Paragraph::new(Text::from(lines));
-        frame.render_widget(block_header_text, chunks[0]);
-        self.draw_transactions_list(frame, chunks[1]);
+        frame.render_widget(block_header_text, area);
     }
 
     fn draw_latest_blocks_list(&mut self, frame: &mut Frame, area: Rect) {
