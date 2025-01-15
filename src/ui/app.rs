@@ -253,7 +253,7 @@ impl App {
                 },
             ]),
             Line::from(vec![
-                Span::styled("", Style::new().bold()),
+                Span::styled("Value: ", Style::new().bold()),
                 Span::raw(format!("{} Ether", to_ether(tx.value()))),
             ]),
         ];
