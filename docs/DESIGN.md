@@ -10,3 +10,15 @@ flowchart LR
 
 `blocktop` is mulithreaded: RPC node communication, database connection, and the UI each have their own threads.
 
+## Database Schema ##
+
+**This is not stable yet**. In general, blockchain objects are stored in a flat manner (so no ER normalisation for the different EIP-2718 transaction subtypes, for instance).
+
+Right now, for an authoritative answer, read the `Database::initialise` function or do this:
+
+```
+$ blocktop --db foobar.db
+$ sqlite3 foobar.db
+sqlite> .schema
+```
+
