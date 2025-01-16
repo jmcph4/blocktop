@@ -30,7 +30,7 @@ At the moment, `blocktop` only supports Websockets or Unix domain sockets as tra
 
 The default invocation (i.e., `blocktop`) will open the TUI and start retrieving data from the default Ethereum RPC node using an in-memory SQLite database.
 
-TODO: insert screenshot
+![Main page](https://pbs.twimg.com/media/GglTD6CbkAA1CpC?format=png&name=large)
 
 #### Controls ####
 
