@@ -1,6 +1,6 @@
 # blocktop #
 
-TODO: embed demo
+[![asciicast](https://asciinema.org/a/698693.svg)](https://asciinema.org/a/698693)
 
 Minimalist TUI block explorer for Ethereum networks.
 
