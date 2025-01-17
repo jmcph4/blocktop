@@ -10,6 +10,14 @@ Minimalist TUI block explorer for Ethereum networks.
 
 See [FUNCTIONALITY](docs/FUNCTIONALITY.md) for the full feature list.
 
+## Installation ##
+
+```
+$ cargo install blocktop
+```
+
+**Note**: `blocktop` is alpha software is is not stable yet.
+
 ## Usage ##
 
 ```
