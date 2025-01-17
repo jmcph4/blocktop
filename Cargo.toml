@@ -4,7 +4,7 @@ version = "0.1.0-rc.1"
 edition = "2021"
 
 authors = ["Jack McPherson <jack@jmcph4.dev>"]
-license-file = "LICENSE"
+license = "MIT"
 description = "A minimalist TUI block explorer for Ethereum blockchains"
 repository = "https://github.com/jmcph4/blocktop"
 readme = "README.md"
