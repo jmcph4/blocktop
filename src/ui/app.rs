@@ -87,6 +87,10 @@ impl App {
         }
     }
 
+    pub fn on_quit(&mut self) {
+        self.should_quit = true
+    }
+
     pub fn on_esc(&mut self) {
         match self.view {
             View::Default => self.should_quit = true,
