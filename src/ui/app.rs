@@ -38,6 +38,18 @@ impl Default for View {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum AddressDisplayMode {
+    Raw,
+    Cooked,
+}
+
+impl Default for AddressDisplayMode {
+    fn default() -> Self {
+        Self::Cooked
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct App {
     pub title: String,
@@ -45,6 +57,7 @@ pub struct App {
     pub block_headers: StatefulList<Header>,
     pub transactions: StatefulList<alloy::rpc::types::eth::Transaction>,
     pub view: View,
+    pub address_display_mode: AddressDisplayMode,
     pub selected_block: alloy::rpc::types::Block,
     pub selected_transaction: alloy::rpc::types::Transaction,
 }
@@ -63,6 +76,14 @@ impl App {
             transactions: StatefulList::with_items(vec![]),
             should_quit: false,
             view: View::default(),
+            address_display_mode: AddressDisplayMode::default(),
+        }
+    }
+
+    fn toggle_address_display_mode(&mut self) {
+        self.address_display_mode = match self.address_display_mode {
+            AddressDisplayMode::Raw => AddressDisplayMode::Cooked,
+            AddressDisplayMode::Cooked => AddressDisplayMode::Raw,
         }
     }
 
@@ -77,6 +98,10 @@ impl App {
     pub fn on_key(&mut self, c: char) {
         if c == 'q' {
             self.should_quit = true;
+        }
+
+        if c == 'r' {
+            self.toggle_address_display_mode();
         }
 
         match self.view {
@@ -248,10 +273,17 @@ impl App {
             Line::from(vec![
                 Span::styled("To:   ", Style::new().bold()),
                 match tx.to() {
-                    Some(addr) => Span::raw(label_address(&addr).to_string()),
+                    Some(addr) => Span::raw(
+                        label_address(&addr, false, self.address_display_mode)
+                            .to_string(),
+                    ),
                     None => Span::raw(format!(
                         "{} (CREATE)",
-                        label_address(&Address::ZERO)
+                        label_address(
+                            &Address::ZERO,
+                            false,
+                            self.address_display_mode
+                        )
                     )),
                 },
             ]),
@@ -418,11 +450,19 @@ impl App {
                     )),
                     Span::raw(format!(
                         "{:<32}",
-                        utils::label_address(&tx.from)
+                        utils::label_address(
+                            &tx.from,
+                            true,
+                            self.address_display_mode
+                        )
                     )),
                     Span::raw(format!(
                         "{:<32}",
-                        utils::label_address(&tx.to().unwrap_or_default())
+                        utils::label_address(
+                            &tx.to().unwrap_or_default(),
+                            true,
+                            self.address_display_mode
+                        )
                     )),
                     Span::raw(format!("{:<8}", tx.nonce())),
                     Span::raw(format!(

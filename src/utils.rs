@@ -12,7 +12,7 @@ use alloy::{
 };
 use url::Url;
 
-use crate::ADDRESS_LABELS;
+use crate::{ui::app::AddressDisplayMode, ADDRESS_LABELS};
 
 const HASH_TRUNCATION_LEN: usize = 8;
 const ADDRESS_HEAD_TAIL_LEN: usize = 4;
@@ -229,14 +229,31 @@ pub fn grab_range(xs: &Bytes, a: usize, b: usize) -> Bytes {
 
 const MAX_ADDR_LEN: usize = 32;
 
-pub fn label_address(address: &Address) -> String {
-    if let Some(label) = ADDRESS_LABELS.get(address) {
-        if label.len() > MAX_ADDR_LEN {
-            (label[0..MAX_ADDR_LEN]).to_string()
-        } else {
-            label.clone()
+pub fn label_address(
+    address: &Address,
+    shorten: bool,
+    mode: crate::ui::app::AddressDisplayMode,
+) -> String {
+    match mode {
+        AddressDisplayMode::Cooked => {
+            if let Some(label) = ADDRESS_LABELS.get(address) {
+                if shorten && label.len() > MAX_ADDR_LEN {
+                    label[0..MAX_ADDR_LEN].to_string()
+                } else {
+                    label.clone()
+                }
+            } else if shorten {
+                shorten_address(address)
+            } else {
+                address.to_string()
+            }
         }
-    } else {
-        shorten_address(address)
+        AddressDisplayMode::Raw => {
+            if shorten {
+                shorten_address(address)
+            } else {
+                address.to_string()
+            }
+        }
     }
 }
