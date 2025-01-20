@@ -48,7 +48,7 @@ The default invocation (i.e., `blocktop`) will open the TUI and start retrieving
 | --- | --- |
 | `j`, `k`, `Up`, `Down` | Scrolls lists | 
 | `e` | In block or transaction view, opens the block or transaction in [Etherscan](https://etherscan.io), respectively |
-| `q` | Exits the application |
+| `q`, `Ctrl+c` | Exits the application |
 | `Esc` | Returns to the previous page or exits the application if on the main page |
 | `r` | Toggles the address display mode (i.e., labelled or raw) |
 
