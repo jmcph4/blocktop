@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use app::App;
-use crossterm::event::{self, Event, KeyCode};
+use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use ratatui::DefaultTerminal;
 
 use crate::db::Database;
@@ -39,6 +39,11 @@ pub fn run(mut terminal: DefaultTerminal, db: &Database) -> eyre::Result<()> {
                     KeyCode::Down | KeyCode::Char('j') => app.on_down(),
                     KeyCode::Enter => app.on_enter(),
                     KeyCode::Esc => app.on_esc(),
+                    KeyCode::Char('c')
+                        if key.modifiers.contains(KeyModifiers::CONTROL) =>
+                    {
+                        app.on_quit()
+                    }
                     KeyCode::Char(c) => app.on_key(c),
                     _ => {}
                 }
