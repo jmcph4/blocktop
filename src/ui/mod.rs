@@ -6,7 +6,7 @@ use ratatui::DefaultTerminal;
 
 use crate::db::Database;
 
-mod app;
+pub mod app;
 mod components;
 
 const TICK_MILLIS: u64 = 250; /* 250ms */
