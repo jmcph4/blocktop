@@ -214,3 +214,13 @@ pub fn to_ether(x: U256) -> f64 {
 pub fn useful_gas_price(tx: &Transaction) -> u128 {
     tx.max_fee_per_gas()
 }
+
+pub fn grab_range(xs: &Bytes, a: usize, b: usize) -> Bytes {
+    if a >= xs.len() {
+        Bytes::from(vec![])
+    } else if b > xs.len() {
+        Bytes::from(xs[a..xs.len()].to_vec())
+    } else {
+        Bytes::from(xs[a..b].to_vec())
+    }
+}

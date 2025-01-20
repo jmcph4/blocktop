@@ -10,7 +10,7 @@ use ratatui::{
     symbols,
     text::{Line, Span, Text},
     widgets::{
-        Bar, BarChart, BarGroup, Block, List, ListItem, Paragraph, Wrap,
+        Bar, BarChart, BarGroup, Block, Borders, List, ListItem, Paragraph,
     },
     Frame,
 };
@@ -18,8 +18,8 @@ use ratatui::{
 use crate::{
     db::Database,
     utils::{
-        self, etherscan_block_url, etherscan_transaction_url, to_ether,
-        to_gwei, useful_gas_price, BuilderIdentity,
+        self, etherscan_block_url, etherscan_transaction_url, grab_range,
+        to_ether, to_gwei, useful_gas_price, BuilderIdentity,
     },
 };
 
@@ -255,6 +255,10 @@ impl App {
             Line::from(vec![
                 Span::styled("Value: ", Style::new().bold()),
                 Span::raw(format!("{} Ether", to_ether(tx.value()))),
+            ]),
+            Line::from(vec![
+                Span::styled("Input: ", Style::new().bold()),
+                Span::raw(format!("({} bytes)", tx.input().len())),
             ]),
         ];
         let transaction_header_text = Paragraph::new(Text::from(lines));
@@ -505,8 +509,24 @@ impl App {
         frame: &mut Frame,
         area: Rect,
     ) {
+        let mut lines = vec![];
+
+        for i in 0..(bytes.len().div_ceil(32)) {
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!("{:#06x}", i * 32),
+                    Style::new().underlined(),
+                ),
+                Span::raw(format!(
+                    "        {}",
+                    &grab_range(bytes, i * 32, (i + 1) * 32).to_string()[2..]
+                )),
+            ]));
+        }
+
         frame.render_widget(
-            Paragraph::new(format!("{}", bytes)).wrap(Wrap { trim: true }),
+            Paragraph::new(Text::from(lines))
+                .block(Block::default().borders(Borders::ALL)),
             area,
         );
     }
