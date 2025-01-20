@@ -12,6 +12,8 @@ use alloy::{
 };
 use url::Url;
 
+use crate::ADDRESS_LABELS;
+
 const HASH_TRUNCATION_LEN: usize = 8;
 const ADDRESS_HEAD_TAIL_LEN: usize = 4;
 
@@ -222,5 +224,19 @@ pub fn grab_range(xs: &Bytes, a: usize, b: usize) -> Bytes {
         Bytes::from(xs[a..xs.len()].to_vec())
     } else {
         Bytes::from(xs[a..b].to_vec())
+    }
+}
+
+const MAX_ADDR_LEN: usize = 32;
+
+pub fn label_address(address: &Address) -> String {
+    if let Some(label) = ADDRESS_LABELS.get(address) {
+        if label.len() > MAX_ADDR_LEN {
+            (label[0..MAX_ADDR_LEN]).to_string()
+        } else {
+            label.clone()
+        }
+    } else {
+        shorten_address(address)
     }
 }

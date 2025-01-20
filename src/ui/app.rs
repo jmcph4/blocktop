@@ -19,7 +19,7 @@ use crate::{
     db::Database,
     utils::{
         self, etherscan_block_url, etherscan_transaction_url, grab_range,
-        to_ether, to_gwei, useful_gas_price, BuilderIdentity,
+        label_address, to_ether, to_gwei, useful_gas_price, BuilderIdentity,
     },
 };
 
@@ -248,8 +248,11 @@ impl App {
             Line::from(vec![
                 Span::styled("To:   ", Style::new().bold()),
                 match tx.to() {
-                    Some(addr) => Span::raw(format!("{}", addr)),
-                    None => Span::raw(format!("{} (CREATE)", Address::ZERO)),
+                    Some(addr) => Span::raw(label_address(&addr).to_string()),
+                    None => Span::raw(format!(
+                        "{} (CREATE)",
+                        label_address(&Address::ZERO)
+                    )),
                 },
             ]),
             Line::from(vec![
@@ -414,12 +417,12 @@ impl App {
                         )
                     )),
                     Span::raw(format!(
-                        "{:<16}",
-                        utils::shorten_address(&tx.from)
+                        "{:<32}",
+                        utils::label_address(&tx.from)
                     )),
                     Span::raw(format!(
-                        "{:<16}",
-                        utils::shorten_address(&tx.to().unwrap_or_default())
+                        "{:<32}",
+                        utils::label_address(&tx.to().unwrap_or_default())
                     )),
                     Span::raw(format!("{:<8}", tx.nonce())),
                     Span::raw(format!(

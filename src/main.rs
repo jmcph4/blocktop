@@ -1,6 +1,10 @@
+use std::collections::HashMap;
+
+use alloy::primitives::Address;
 use clap::Parser;
 use client::{AnyClient, Client};
 use log::warn;
+use serde::Deserialize;
 
 use crate::{
     cli::Opts,
@@ -15,6 +19,26 @@ pub mod db;
 pub mod services;
 pub mod ui;
 pub mod utils;
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Deserialize)]
+struct LabelEntry {
+    pub address: Address,
+    #[serde(rename = "chainId")]
+    chain_id: u64,
+    label: String,
+    #[serde(rename = "nameTag")]
+    pub name_tag: Option<String>,
+}
+
+const LABELS_JSON_DATA: &str = include_str!("../assets/labels/mainnet.json");
+
+lazy_static::lazy_static! {
+    static ref ADDRESS_LABELS: HashMap<Address, String> = {
+        let labels: Vec<LabelEntry> = serde_json::from_str(LABELS_JSON_DATA).expect("Invalid JSON data for address labels");
+        labels.iter().filter(|label| label.name_tag.is_some()).map(|label| (label.address, label.name_tag.clone().unwrap())).collect()
+    };
+}
 
 /// Retrieve an initial block from the endpoint so that upon UI startup there's data to render
 #[allow(clippy::needless_question_mark)] /* clippy gets this wrong */
