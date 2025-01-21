@@ -14,7 +14,7 @@ categories = ["cryptography::cryptocurrencies", "development-tools"]
 [dependencies]
 alloy = { version = "0.9.1", features = ["provider-ws", "rpc-types-eth", "provider-ipc"] }
 chrono = "0.4.39"
-clap = { version = "4.5.23", features = ["derive"] }
+clap = { version = "4.5.27", features = ["derive"] }
 crossterm = "0.28.1"
 eyre = "0.6.12"
 futures = "0.3.31"
