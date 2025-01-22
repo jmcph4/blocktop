@@ -18,6 +18,6 @@ pub struct Opts {
     pub list_block_hashes: bool,
     #[clap(long)]
     pub block: Option<BlockHashOrNumber>,
-    #[clap(long)]
+    #[clap(long, alias("tx"))]
     pub transaction: Option<TxHash>,
 }
