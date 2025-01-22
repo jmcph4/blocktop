@@ -1,6 +1,10 @@
 use std::time::{Duration, Instant};
 
-use app::App;
+use alloy::{
+    eips::{BlockHashOrNumber, HashOrNumber},
+    primitives::TxHash,
+};
+use app::{App, View};
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use ratatui::DefaultTerminal;
 
@@ -12,7 +16,12 @@ mod components;
 const TICK_MILLIS: u64 = 250; /* 250ms */
 
 /// Drives the TUI app
-pub fn run(mut terminal: DefaultTerminal, db: &Database) -> eyre::Result<()> {
+pub fn run(
+    mut terminal: DefaultTerminal,
+    db: &Database,
+    block: Option<BlockHashOrNumber>,
+    transaction: Option<TxHash>,
+) -> eyre::Result<()> {
     /* we're able to wet the UI with selected chain objects due to wetting the
      * database on startup */
     let latest_block = db.latest_block()?.expect(
@@ -25,6 +34,21 @@ pub fn run(mut terminal: DefaultTerminal, db: &Database) -> eyre::Result<()> {
         .next()
         .expect("invariant violated: latest block must be non-empty");
     let mut app = App::new("blocktop".to_string(), latest_block, latest_tx);
+
+    if let Some(specified_block) = block {
+        app.view = View::Block;
+        let specified_block_hash = match specified_block {
+            HashOrNumber::Hash(h) => h,
+            HashOrNumber::Number(x) => {
+                db.block_by_number(x)?.unwrap().header.hash
+            }
+        };
+        app.selected_block = db.block_by_hash(specified_block_hash)?.unwrap();
+    } else if let Some(specified_tx) = transaction {
+        app.view = View::Transaction;
+        app.selected_transaction = db.transaction(specified_tx)?.unwrap();
+    }
+
     let tick_rate: Duration = Duration::from_millis(TICK_MILLIS);
     let mut last_tick = Instant::now();
 

@@ -1,14 +1,16 @@
 //! SQLite database interaction for storing indexed blockchain data
-use std::{iter::zip, path::PathBuf, sync::Arc, time::Duration};
+use std::{iter::zip, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 use alloy::{
     consensus::{
         Signed, Transaction as TraitTransaction, TxEip1559, TxEip2930,
         TxEip4844, TxEip4844Variant, TxEnvelope, TxLegacy,
     },
+    eips::{BlockId, BlockNumberOrTag},
     hex::{FromHex, FromHexError},
     primitives::{
-        Address, BlockHash, Bytes, PrimitiveSignature, TxHash, TxKind, U256,
+        Address, BlockHash, BlockNumber, Bytes, PrimitiveSignature, TxHash,
+        TxKind, U256,
     },
     rpc::types::{eth::Header, Block, Transaction},
 };
@@ -89,14 +91,17 @@ impl Database {
     /// Retrieve the [`Block`] with the highest timestamp (if it exists)
     pub fn latest_block(&self) -> eyre::Result<Option<Block>> {
         match self.latest_block_header()? {
-            Some(latest_header) => self.block(latest_header.hash),
+            Some(latest_header) => self.block_by_hash(latest_header.hash),
             None => Ok(None),
         }
     }
 
     /// Retrieves the block [`Header`] with the given [`BlockHash`] (if it
     /// exists)
-    pub fn header(&self, hash: BlockHash) -> eyre::Result<Option<Header>> {
+    pub fn header_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> eyre::Result<Option<Header>> {
         debug!(
             "Block header {} requested from database...",
             hash.to_string()
@@ -115,17 +120,70 @@ impl Database {
         }
     }
 
-    /// Retrieves the block with the associated identifier (if it exists)
-    pub fn block(&self, hash: BlockHash) -> eyre::Result<Option<Block>> {
+    /// Retrieves the block [`Header`] with the given [`BlockNumber`] (if it
+    /// exists)
+    pub fn header_by_number(
+        &self,
+        number: BlockNumber,
+    ) -> eyre::Result<Option<Header>> {
+        debug!("Block header #{} requested from database...", number,);
+        match self.conn_pool.get()?.query_row(
+            format!("SELECT * FROM block_headers WHERE number = '{}'", number)
+                .as_str(),
+            [],
+            |row| Ok(Self::row_to_header(row)),
+        ) {
+            Ok(t) => Ok(Some(t?)),
+            Err(e) => match e {
+                Error::QueryReturnedNoRows => Ok(None),
+                _ => Err(e.into()),
+            },
+        }
+    }
+
+    /// Retrieves the block with the associated hash (if it exists)
+    pub fn block_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> eyre::Result<Option<Block>> {
         debug!("Block {} requested from database...", hash);
 
-        match self.header(hash).inspect_err(|e| {
+        match self.header_by_hash(hash).inspect_err(|e| {
             error!("Failed to retrieve block header from the database: {e:?}")
         })? {
             Some(header) => Ok(Some(Block::new(header, alloy::rpc::types::BlockTransactions::Full(
-                self.transactions_by_block(hash).inspect_err(|e| error!("Failed to retrieve associated transactions from the database: {e:?}"))?
+                self.transactions_by_block_hash(hash).inspect_err(|e| error!("Failed to retrieve associated transactions from the database: {e:?}"))?
             )))),
             None => Ok(None),
+        }
+    }
+
+    /// Retrieves the block with the associated number (if it exists)
+    pub fn block_by_number(
+        &self,
+        number: BlockNumber,
+    ) -> eyre::Result<Option<Block>> {
+        debug!("Block #{} requested from database...", number);
+
+        match self.header_by_number(number).inspect_err(|e| {
+            error!("Failed to retrieve block header from the database: {e:?}")
+        })? {
+            Some(header) => Ok(Some(Block::new(header, alloy::rpc::types::BlockTransactions::Full(
+                self.transactions_by_block_number(number).inspect_err(|e| error!("Failed to retrieve associated transactions from the database: {e:?}"))?
+            )))),
+            None => Ok(None),
+        }
+    }
+
+    /// Retrieves the [`Block`] matching the given [`BlockId`] (if it exists)
+    pub fn block(&self, id: BlockId) -> eyre::Result<Option<Block>> {
+        match id {
+            BlockId::Hash(h) => self.block_by_hash(h.into()),
+            BlockId::Number(t) => match t {
+                BlockNumberOrTag::Number(n) => self.block_by_number(n),
+                BlockNumberOrTag::Latest => self.latest_block(),
+                _ => unimplemented!(),
+            },
         }
     }
 
@@ -168,11 +226,42 @@ impl Database {
     /// If there are no such transactions in the database, the returned vector
     /// is guaranteed to have a length of zero.
     #[allow(clippy::let_and_return)] /* clippy gets this wrong */
-    pub fn transactions_by_block(
+    pub fn transactions_by_block_hash(
         &self,
         hash: BlockHash,
     ) -> eyre::Result<Vec<Transaction>> {
         let conn = self.conn_pool.get()?;
+        let mut stmt =
+            conn.prepare("SELECT * FROM transactions WHERE block_hash = ?")?;
+        let txs = stmt
+            .query_and_then([hash.to_string()], |row| {
+                Self::row_to_transaction(row)
+            })?
+            .collect();
+        txs
+    }
+
+    /// Retrieves all of the [`Transaction`]s associated with the [`Block`]
+    /// with the given [`BlockNumber`]
+    ///
+    /// If there are no such transactions in the database, the returned vector
+    /// is guaranteed to have a length of zero.
+    #[allow(clippy::let_and_return)] /* clippy gets this wrong */
+    pub fn transactions_by_block_number(
+        &self,
+        number: BlockNumber,
+    ) -> eyre::Result<Vec<Transaction>> {
+        let conn = self.conn_pool.get()?;
+        let mut get_hash_stmt =
+            conn.prepare("SELECT hash FROM block_headers WHERE number = ?")?;
+        let hash: BlockHash = get_hash_stmt
+            .query_and_then([number], |row| {
+                Ok::<BlockHash, ErrReport>(BlockHash::from_str(
+                    row.get::<usize, String>(0)?.as_str(),
+                )?)
+            })?
+            .next()
+            .unwrap()?;
         let mut stmt =
             conn.prepare("SELECT * FROM transactions WHERE block_hash = ?")?;
         let txs = stmt
