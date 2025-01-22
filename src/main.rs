@@ -52,14 +52,11 @@ async fn populate_db(opts: &Opts, db: &mut Database) -> eyre::Result<()> {
         (Some(block), None) => {
             Ok(db.add_block(&client.block(block.into()).await?)?)
         }
-        (None, Some(tx)) => {
+        (None, Some(tx_hash)) => {
+            let tx = client.transaction(tx_hash).await?;
             /* recall that we *must* have at least one *block* in the db at all times */
-            db.add_block(
-                &client
-                    .block(alloy::eips::BlockNumberOrTag::Latest.into())
-                    .await?,
-            )?;
-            db.add_transaction(&client.transaction(tx).await?)
+            db.add_block(&client.block(tx.block_hash.unwrap().into()).await?)?;
+            Ok(())
         }
         _ => Ok(db.add_block(
             &client
