@@ -46,6 +46,8 @@ pub fn run(
         app.selected_block = db.block_by_hash(specified_block_hash)?.unwrap();
     } else if let Some(specified_tx) = transaction {
         app.view = View::Transaction;
+        app.selected_block =
+            db.block_by_transaction_hash(specified_tx)?.unwrap();
         app.selected_transaction = db.transaction(specified_tx)?.unwrap();
     }
 
