@@ -88,6 +88,24 @@ impl Database {
         }
     }
 
+    pub fn block_by_transaction_hash(
+        &self,
+        hash: TxHash,
+    ) -> eyre::Result<Option<Block>> {
+        debug!(
+            "Associated block for transaction {} requested from database...",
+            hash
+        );
+
+        match self.transaction(hash)? {
+            Some(tx) => match tx.block_hash {
+                Some(block_hash) => self.block_by_hash(block_hash),
+                None => Ok(None),
+            },
+            None => Ok(None),
+        }
+    }
+
     /// Retrieve the [`Block`] with the highest timestamp (if it exists)
     pub fn latest_block(&self) -> eyre::Result<Option<Block>> {
         match self.latest_block_header()? {
