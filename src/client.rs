@@ -6,8 +6,8 @@ use std::{
 };
 
 use alloy::{
-    eips::BlockNumberOrTag,
-    primitives::ChainId,
+    eips::BlockId,
+    primitives::{ChainId, TxHash},
     providers::{
         IpcConnect, Provider, ProviderBuilder, RootProvider, WsConnect,
     },
@@ -38,7 +38,9 @@ pub trait Client {
         &self,
     ) -> eyre::Result<Box<dyn Stream<Item = Transaction> + Unpin>>;
     /// Retrieve the [`Block`] associated with the given identifier
-    async fn block(&self, tag: BlockNumberOrTag) -> eyre::Result<Block>;
+    async fn block(&self, id: BlockId) -> eyre::Result<Block>;
+    /// Retrieve the [`Transaction`] associated with the given [`TxHash`]
+    async fn transaction(&self, hash: TxHash) -> eyre::Result<Transaction>;
 }
 
 /// Client type that is generic over all supported transports
@@ -116,10 +118,17 @@ impl Client for AnyClient {
         })
     }
 
-    async fn block(&self, tag: BlockNumberOrTag) -> eyre::Result<Block> {
+    async fn block(&self, id: BlockId) -> eyre::Result<Block> {
         Ok(match self {
-            Self::Ws(t) => t.block(tag).await?,
-            Self::Ipc(t) => t.block(tag).await?,
+            Self::Ws(t) => t.block(id).await?,
+            Self::Ipc(t) => t.block(id).await?,
+        })
+    }
+
+    async fn transaction(&self, hash: TxHash) -> eyre::Result<Transaction> {
+        Ok(match self {
+            Self::Ws(t) => t.transaction(hash).await?,
+            Self::Ipc(t) => t.transaction(hash).await?,
         })
     }
 }
@@ -196,16 +205,21 @@ impl Client for WsClient {
         ))
     }
 
-    async fn block(&self, tag: BlockNumberOrTag) -> eyre::Result<Block> {
-        debug!("Retrieving block {}...", tag);
+    async fn block(&self, id: BlockId) -> eyre::Result<Block> {
+        debug!("Retrieving block {}...", id);
         match self
             .provider
-            .get_block(
-                tag.into(),
-                alloy::rpc::types::BlockTransactionsKind::Full,
-            )
+            .get_block(id, alloy::rpc::types::BlockTransactionsKind::Full)
             .await?
         {
+            Some(t) => Ok(t),
+            None => Err(eyre!("No block")),
+        }
+    }
+
+    async fn transaction(&self, hash: TxHash) -> eyre::Result<Transaction> {
+        debug!("Retrieving transaction {}...", hash);
+        match self.provider.get_transaction_by_hash(hash).await? {
             Some(t) => Ok(t),
             None => Err(eyre!("No block")),
         }
@@ -286,16 +300,21 @@ impl Client for IpcClient {
         ))
     }
 
-    async fn block(&self, tag: BlockNumberOrTag) -> eyre::Result<Block> {
-        debug!("Retrieving block {}...", tag);
+    async fn block(&self, id: BlockId) -> eyre::Result<Block> {
+        debug!("Retrieving block {}...", id);
         match self
             .provider
-            .get_block(
-                tag.into(),
-                alloy::rpc::types::BlockTransactionsKind::Full,
-            )
+            .get_block(id, alloy::rpc::types::BlockTransactionsKind::Full)
             .await?
         {
+            Some(t) => Ok(t),
+            None => Err(eyre!("No block")),
+        }
+    }
+
+    async fn transaction(&self, hash: TxHash) -> eyre::Result<Transaction> {
+        debug!("Retrieving transaction {}...", hash);
+        match self.provider.get_transaction_by_hash(hash).await? {
             Some(t) => Ok(t),
             None => Err(eyre!("No block")),
         }

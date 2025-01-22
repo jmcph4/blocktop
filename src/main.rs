@@ -43,12 +43,22 @@ lazy_static::lazy_static! {
 /// Retrieve an initial block from the endpoint so that upon UI startup there's data to render
 #[allow(clippy::needless_question_mark)] /* clippy gets this wrong */
 async fn populate_db(opts: &Opts, db: &mut Database) -> eyre::Result<()> {
-    Ok(db.add_block(
-        &AnyClient::new(opts.rpc.clone())
-            .await?
-            .block(alloy::eips::BlockNumberOrTag::Latest)
-            .await?,
-    )?)
+    let rpc = opts.rpc.clone();
+    let perhaps_block = opts.block;
+    let perhaps_tx = opts.transaction;
+    let client = AnyClient::new(rpc).await?;
+
+    match (perhaps_block, perhaps_tx) {
+        (Some(block), None) => {
+            Ok(db.add_block(&client.block(block.into()).await?)?)
+        }
+        (None, Some(tx)) => db.add_transaction(&client.transaction(tx).await?),
+        _ => Ok(db.add_block(
+            &client
+                .block(alloy::eips::BlockNumberOrTag::Latest.into())
+                .await?,
+        )?),
+    }
 }
 
 fn main() -> eyre::Result<()> {
@@ -84,7 +94,7 @@ fn main() -> eyre::Result<()> {
 
     if !opts.headless {
         let terminal = ratatui::init();
-        let result = run(terminal, &db);
+        let result = run(terminal, &db, opts.block, opts.transaction);
         ratatui::restore();
         result
     } else {

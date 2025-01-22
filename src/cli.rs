@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use alloy::{eips::BlockHashOrNumber, primitives::TxHash};
 use clap::Parser;
 use url::Url;
 
@@ -15,4 +16,8 @@ pub struct Opts {
     pub headless: bool,
     #[clap(long, action)]
     pub list_block_hashes: bool,
+    #[clap(long)]
+    pub block: Option<BlockHashOrNumber>,
+    #[clap(long)]
+    pub transaction: Option<TxHash>,
 }

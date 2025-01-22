@@ -188,7 +188,7 @@ impl App {
         if let Some(selected_header) = self.get_selected_header() {
             if !matches!(self.view, View::Block) {
                 if let Some(selected_block) =
-                    db.block(selected_header.hash).unwrap()
+                    db.block_by_hash(selected_header.hash).unwrap()
                 {
                     self.selected_block = selected_block;
                     self.transactions = StatefulList::with_items(
