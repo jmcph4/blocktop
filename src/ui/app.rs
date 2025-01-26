@@ -19,7 +19,8 @@ use crate::{
     db::Database,
     utils::{
         self, etherscan_block_url, etherscan_transaction_url, grab_range,
-        label_address, to_ether, to_gwei, useful_gas_price, BuilderIdentity,
+        label_address, libmev_block_url, to_ether, to_gwei, useful_gas_price,
+        BuilderIdentity,
     },
 };
 
@@ -113,6 +114,16 @@ impl App {
                 if c == 'e' {
                     webbrowser::open(
                         etherscan_block_url(
+                            self.selected_block.clone().header.number,
+                        )
+                        .as_str(),
+                    )
+                    .unwrap()
+                }
+
+                if c == 'l' {
+                    webbrowser::open(
+                        libmev_block_url(
                             self.selected_block.clone().header.number,
                         )
                         .as_str(),

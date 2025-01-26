@@ -51,6 +51,7 @@ The default invocation (i.e., `blocktop`) will open the TUI and start retrieving
 | `q`, `Ctrl+c` | Exits the application |
 | `Esc` | Returns to the previous page or exits the application if on the main page |
 | `r` | Toggles the address display mode (i.e., labelled or raw) |
+| `l` | In block view, opens the block in [libMEV](https://libmev.com) |
 
 ### Headless Mode ###
 
