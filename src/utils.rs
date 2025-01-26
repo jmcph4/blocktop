@@ -144,6 +144,14 @@ impl From<Bytes> for BuilderIdentity {
     }
 }
 
+/// Given a block number, produce the libMEV [`Url`] for the corresponding
+/// block (see <https://libmev.com>)
+pub fn libmev_block_url(block_number: u64) -> Url {
+    format!("https://libmev.com/blocks/{block_number}")
+        .parse()
+        .expect("invariant violated: constructed invalid block URL")
+}
+
 /// Given a block number, produce the Etherscan [`Url`] for the corresponding
 /// block
 pub fn etherscan_block_url(block_number: u64) -> Url {
