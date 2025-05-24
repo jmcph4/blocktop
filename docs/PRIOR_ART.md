@@ -1,6 +1,6 @@
 # Prior Art #
 
-| Block Explorer | Description | Stack | Open Source? | Source Code |
+| Product Name | Description | Stack | Open Source? | Source Code |
 | --- | --- | --- | --- | --- |
 | **Etherscan**     | The most widely used Ethereum block explorer. Supports rich transaction history, token tracking, and contract interactions. | (proprietary) | ❌ | N/A |
 | **Beaconcha.in**  | Ethereum 2.0 beacon chain explorer with staking and validator insights. | Golang, PostgreSQL, React | ✅ | [gobitfly/eth2-beaconchain-explorer](https://github.com/gobitfly/eth2-beaconchain-explorer) |
