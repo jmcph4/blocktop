@@ -5,7 +5,7 @@ use clap::Parser;
 use url::Url;
 
 pub const DEFAULT_PORT: u16 = 80;
-pub const DEFAULT_METRICS_ONLY_PORT: u16 = 8080;
+pub const DEFAULT_METRICS_ONLY_PORT: u16 = 9898;
 
 /// Minimalist TUI block explorer and chain indexer
 #[derive(Clone, Debug, Parser)]
