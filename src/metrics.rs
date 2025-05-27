@@ -1,22 +1,22 @@
 use std::sync::Arc;
 
-use prometheus::{Gauge, Opts, Registry};
+use prometheus::{IntGauge, Opts, Registry};
 
 #[derive(Clone, Debug)]
 pub struct Metrics {
-    pub rpc_requests: Arc<Gauge>,
-    pub blocks_added: Arc<Gauge>,
+    pub rpc_requests: Arc<IntGauge>,
+    pub blocks_added: Arc<IntGauge>,
     pub registry: Arc<Registry>,
 }
 
 impl Metrics {
     pub fn new() -> Self {
-        let rpc_requests = Gauge::with_opts(Opts::new(
+        let rpc_requests = IntGauge::with_opts(Opts::new(
             "rpc_requests",
             "The number of requests made to the RPC node",
         ))
         .expect("Invalid rpc_requests gauge definition");
-        let blocks_added = Gauge::with_opts(Opts::new(
+        let blocks_added = IntGauge::with_opts(Opts::new(
             "blocks_added",
             "The number of blocks added to the index",
         ))
