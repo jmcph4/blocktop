@@ -1,10 +1,12 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 use alloy::primitives::Address;
 use clap::Parser;
 use client::{AnyClient, Client};
 use log::warn;
+use metrics::Metrics;
 use serde::Deserialize;
+use services::metrics::MetricsService;
 
 use crate::{
     cli::Opts,
@@ -16,6 +18,7 @@ use crate::{
 pub mod cli;
 pub mod client;
 pub mod db;
+pub mod metrics;
 pub mod services;
 pub mod ui;
 pub mod utils;
@@ -88,6 +91,8 @@ fn main() -> eyre::Result<()> {
             .for_each(|hash| println!("{hash}"));
     }
 
+    let metrics = Arc::new(Metrics::new());
+
     /* wet the database */
     tokio::task::block_in_place(|| {
         tokio::runtime::Runtime::new()
@@ -95,7 +100,15 @@ fn main() -> eyre::Result<()> {
             .block_on(async { populate_db(&opts, &mut db).await })
     })?;
 
-    let blockchain = BlockchainService::spawn(opts.rpc, db.clone());
+    let blockchain =
+        BlockchainService::spawn(opts.rpc.clone(), db.clone(), metrics.clone());
+
+    if opts.metrics {
+        let _metrics_service = MetricsService::spawn(
+            ([0, 0, 0, 0], opts.port().unwrap()).into(),
+            metrics.clone(),
+        );
+    }
 
     if !opts.headless {
         let terminal = ratatui::init();

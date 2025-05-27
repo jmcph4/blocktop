@@ -1,5 +1,8 @@
 //! Indexing service for EVM chains
-use std::thread::{self, JoinHandle};
+use std::{
+    sync::Arc,
+    thread::{self, JoinHandle},
+};
 
 use alloy::providers::Provider;
 use eyre::eyre;
@@ -11,6 +14,7 @@ use url::Url;
 use crate::{
     client::{AnyClient, Client},
     db::Database,
+    metrics::Metrics,
 };
 
 const NUM_WORKERS: usize = 1;
@@ -28,7 +32,11 @@ impl BlockchainService {
     /// data to the provided [`Database`].
     ///
     /// Note that joining on the returned thread handle will never yield.
-    pub fn spawn(rpc: Url, db: Database) -> JoinHandle<eyre::Result<Self>> {
+    pub fn spawn(
+        rpc: Url,
+        db: Database,
+        metrics: Arc<Metrics>,
+    ) -> JoinHandle<eyre::Result<Self>> {
         thread::spawn(move || {
             let runtime = Builder::new_multi_thread()
                 .worker_threads(NUM_WORKERS)
@@ -43,6 +51,7 @@ impl BlockchainService {
                 while let Some(header) =
                     this.client.block_headers().await?.next().await
                 {
+                    metrics.rpc_requests.inc();
                     let block = this
                         .client
                         .provider()
@@ -55,6 +64,7 @@ impl BlockchainService {
                     db.add_block(&block).inspect_err(|e| {
                         error!("Failed to write block to database: {e:?}")
                     })?;
+                    metrics.blocks_added.inc();
                     debug!("Saved header: {}", &header.hash);
                 }
                 Ok(this)
