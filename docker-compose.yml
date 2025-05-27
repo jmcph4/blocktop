@@ -1,7 +1,7 @@
 services:
   blocktop:
     build: .
-    command: ["blocktop", "--headless", "--metrics"]
+    command: ["--headless", "--metrics"]
     environment:
       - RUST_LOG=info
     ports:
