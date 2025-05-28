@@ -57,7 +57,6 @@ impl BlockchainService {
                         .provider()
                         .get_block_by_hash(
                             header.hash,
-                            alloy::rpc::types::BlockTransactionsKind::Full,
                         )
                         .await.inspect_err(|e| {error!("Failed to retrieve block by hash from RPC: {e:?}"); metrics.failed_rpc_requests.inc();})?
                         .ok_or(eyre!("No such block"))?;

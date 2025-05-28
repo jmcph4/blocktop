@@ -9,8 +9,7 @@ use alloy::{
     eips::{BlockId, BlockNumberOrTag},
     hex::{FromHex, FromHexError},
     primitives::{
-        Address, BlockHash, BlockNumber, Bytes, PrimitiveSignature, TxHash,
-        TxKind, U256,
+        Address, BlockHash, BlockNumber, Bytes, Signature, TxHash, TxKind, U256,
     },
     rpc::types::{eth::Header, Block, Transaction},
 };
@@ -297,7 +296,7 @@ impl Database {
     ) -> eyre::Result<()> {
         let tx_info = transaction.info();
 
-        let to = match &transaction.inner {
+        let to = match &transaction.inner.inner() {
             TxEnvelope::Legacy(t) => match t.tx().to {
                 TxKind::Create => Address::ZERO,
                 TxKind::Call(a) => a,
@@ -367,7 +366,7 @@ impl Database {
                     tx_info.block_hash.unwrap().to_string(),
                     tx_info.block_number.unwrap().to_string(),
                     tx_info.index.unwrap().to_string(),
-                    transaction.from.to_string(),
+                    transaction.inner.signer().to_string(),
                     tx_type.to_string(),
                     transaction.chain_id().unwrap_or(1),
                     transaction.nonce(),
@@ -609,7 +608,7 @@ impl Database {
                     value,
                     input,
                 },
-                PrimitiveSignature::test_signature(),
+                Signature::test_signature(),
                 hash,
             )),
             1 => TxEnvelope::Eip2930(Signed::new_unchecked(
@@ -626,7 +625,7 @@ impl Database {
                     access_list: vec![].into(), /* TODO(jmcph4): support access lists */
                     input,
                 },
-                PrimitiveSignature::test_signature(),
+                Signature::test_signature(),
                 hash,
             )),
             2 => TxEnvelope::Eip1559(Signed::new_unchecked(
@@ -646,7 +645,7 @@ impl Database {
                     access_list: vec![].into(), /* TODO(jmcph4): support access lists */
                     input,
                 },
-                PrimitiveSignature::test_signature(),
+                Signature::test_signature(),
                 hash,
             )),
             3 => TxEnvelope::Eip4844(Signed::new_unchecked(
@@ -665,7 +664,7 @@ impl Database {
                     max_fee_per_blob_gas: 0,
                     input,
                 }),
-                PrimitiveSignature::test_signature(),
+                Signature::test_signature(),
                 hash,
             )),
             _ => return Err(eyre!("Unsupported EIP-2718 transaction type")),

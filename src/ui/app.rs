@@ -283,7 +283,7 @@ impl App {
             ]),
             Line::from(vec![
                 Span::styled("From: ", Style::new().bold()),
-                Span::raw(format!("{}", tx.from)),
+                Span::raw(format!("{}", tx.as_recovered().signer())),
             ]),
             Line::from(vec![
                 Span::styled("To:   ", Style::new().bold()),
@@ -466,7 +466,7 @@ impl App {
                     Span::raw(format!(
                         "{:<32}",
                         utils::label_address(
-                            &tx.from,
+                            &tx.as_recovered().signer(),
                             true,
                             self.address_display_mode
                         )
