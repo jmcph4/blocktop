@@ -4,8 +4,8 @@ use std::{iter::zip, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 use alloy::{
     consensus::{
         transaction::Recovered, Signed, Transaction as TraitTransaction,
-        TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
-        TxLegacy,
+        TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702,
+        TxEnvelope, TxLegacy,
     },
     eips::{BlockId, BlockNumberOrTag},
     hex::{FromHex, FromHexError},
@@ -120,10 +120,7 @@ impl Database {
         &self,
         hash: BlockHash,
     ) -> eyre::Result<Option<Header>> {
-        debug!(
-            "Block header {} requested from database...",
-            hash.to_string()
-        );
+        debug!("Block header {} requested from database...", hash);
         match self.conn_pool.get()?.query_row(
             format!("SELECT * FROM block_headers WHERE hash = '{}'", hash)
                 .as_str(),
@@ -665,6 +662,24 @@ impl Database {
                     max_fee_per_blob_gas: 0,
                     input,
                 }),
+                Signature::test_signature(),
+                hash,
+            )),
+            4 => TxEnvelope::Eip7702(Signed::new_unchecked(
+                TxEip7702 {
+                    chain_id,
+                    nonce,
+                    gas_limit,
+                    max_fee_per_gas: max_fee_per_gas.into(),
+                    max_priority_fee_per_gas: max_priority_fee_per_gas
+                        .unwrap()
+                        .into(),
+                    to,
+                    value,
+                    access_list: vec![].into(), /* TODO(jmcph4): support access lists */
+                    authorization_list: vec![], /* TODO(jmcph4): support auth lists */
+                    input,
+                },
                 Signature::test_signature(),
                 hash,
             )),
