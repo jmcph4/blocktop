@@ -222,7 +222,7 @@ impl Client for WsClient {
 
     async fn block(&self, id: BlockId) -> eyre::Result<Block> {
         debug!("Retrieving block {}...", id);
-        match self.provider.get_block(id).await? {
+        match self.provider.get_block(id).full().await? {
             Some(t) => Ok(t),
             None => Err(eyre!("No block")),
         }
@@ -313,7 +313,7 @@ impl Client for IpcClient {
 
     async fn block(&self, id: BlockId) -> eyre::Result<Block> {
         debug!("Retrieving block {}...", id);
-        match self.provider.get_block(id).await? {
+        match self.provider.get_block(id).full().await? {
             Some(t) => Ok(t),
             None => Err(eyre!("No block")),
         }
