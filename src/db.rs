@@ -3,8 +3,9 @@ use std::{iter::zip, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 use alloy::{
     consensus::{
-        Signed, Transaction as TraitTransaction, TxEip1559, TxEip2930,
-        TxEip4844, TxEip4844Variant, TxEnvelope, TxLegacy,
+        transaction::Recovered, Signed, Transaction as TraitTransaction,
+        TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEnvelope,
+        TxLegacy,
     },
     eips::{BlockId, BlockNumberOrTag},
     hex::{FromHex, FromHexError},
@@ -594,7 +595,7 @@ impl Database {
 
         let tx_type = row.get::<&str, u64>("type")?;
 
-        let inner: TxEnvelope = match tx_type {
+        let envelope: TxEnvelope = match tx_type {
             0 => TxEnvelope::Legacy(Signed::new_unchecked(
                 TxLegacy {
                     chain_id: Some(chain_id),
@@ -671,12 +672,14 @@ impl Database {
         };
 
         Ok(Transaction {
-            inner,
+            inner: Recovered::new_unchecked(
+                envelope,
+                row.get::<&str, String>("from_address")?.parse()?,
+            ),
             block_hash: Some(row.get::<&str, String>("block_hash")?.parse()?),
             block_number: Some(row.get::<&str, u64>("block_number")?),
             transaction_index: Some(row.get::<&str, u64>("position")?),
             effective_gas_price: None, /* deprecated */
-            from: row.get::<&str, String>("from_address")?.parse()?,
         })
     }
 
