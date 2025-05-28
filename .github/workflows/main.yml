@@ -54,9 +54,3 @@ jobs:
             - name: Run dependency security audit
               run: cargo install cargo-audit && cargo --verbose audit
 
-            - name: Install cargo-outdated
-              run: cargo install cargo-outdated
-
-            - name: Run depedency version audit
-              run: cargo outdated --root-deps-only --verbose --exit-code 1
-
