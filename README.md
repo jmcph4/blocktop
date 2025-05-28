@@ -26,13 +26,19 @@ A minimalist TUI block explorer for Ethereum blockchains
 Usage: blocktop [OPTIONS]
 
 Options:
-  -r, --rpc <RPC>          [default: wss://eth.merkle.io]
-  -d, --db <DB>            
-      --headless           
-      --list-block-hashes  
-  -h, --help               Print help
-  -V, --version            Print version
+  -r, --rpc <RPC>                  [default: wss://eth.merkle.io]
+  -d, --db <DB>                    
+      --headless                   
+      --list-block-hashes          
+      --block <BLOCK>              
+      --transaction <TRANSACTION>  
+  -s, --serve                      
+  -m, --metrics                    
+  -p, --port <PORT>                
+  -h, --help                       Print help
+  -V, --version                    Print version
 ```
+
 
 At the moment, `blocktop` only supports Websockets or Unix domain sockets as transports for RPC communication. `blocktop` makes use of the [free Ethereum RPC service provided by Merkle](https://merkle.io/free-eth-rpc) by default.
 
@@ -59,12 +65,11 @@ To invoke solely the indexer without the TUI frontend, specify the `--headless` 
 
 ```
 $ RUST_LOG=info blocktop --headless
- 2025-01-15T05:13:06.017Z INFO  blocktop::client > Websockets client initialised (endpoint: wss://eth.merkle.io/, chain: 1)
- 2025-01-15T05:13:06.806Z INFO  blocktop::db     > Wrote block 0x2d21b100f838bb2656bcd0599cbdc30048d6d1a694581c6ec781e8f58961c729 to the database
- 2025-01-15T05:13:08.077Z INFO  blocktop::client > Websockets client initialised (endpoint: wss://eth.merkle.io/, chain: 1)
- 2025-01-15T05:13:19.203Z INFO  blocktop::db     > Wrote block 0x5850d0c1ba90da1cfe682ad29a727b841038ead07e198477869550cbb387f053 to the database
- 2025-01-15T05:13:26.187Z INFO  blocktop::db     > Wrote block 0x52a43747e20465e7407ccba6915a027457220e06399ab992409b3ace66e40301 to the database
- 2025-01-15T05:13:39.812Z INFO  blocktop::db     > Wrote block 0xf31df89a9277295916f714d78a3ccf708826951a7a6e0ac40563b18a51d14f76 to the database
+ 2025-05-28T10:14:05.298Z WARN  blocktop > Headless mode without specifying an on-disk database. All data will be lost on exit.
+ 2025-05-28T10:14:06.493Z INFO  blocktop::client > Websockets client initialised (endpoint: wss://eth.merkle.io/, chain: 1)
+ 2025-05-28T10:14:07.440Z INFO  blocktop::db     > Wrote block 0xed8f155905becde73d4eae0b03a3bd6ddce554aa0c4fe2495bc61238e6207885 to the database
+ 2025-05-28T10:14:08.840Z INFO  blocktop::client > Websockets client initialised (endpoint: wss://eth.merkle.io/, chain: 1)
+ 2025-05-28T10:14:14.234Z INFO  blocktop::db     > Wrote block 0xe828b36306c36ed8d5175540e9444861507e27b8570760d1409787fb9ad233c7 to the database
 ```
 
 As the warning-level log line at the start of the output indicates, headless operation also benefits from specifying an on-disk database to save chain state to:
@@ -72,4 +77,29 @@ As the warning-level log line at the start of the output indicates, headless ope
 ```
 $ RUST_LOG=info blocktop --headless --db foobar.db
 ```
+
+#### Metrics ####
+
+To expose metrics for scraping via Prometheus, use the `--metrics` flag:
+
+```
+$ RUST_LOG=info blocktop --headless --metrics
+```
+
+Then, concurrently:
+
+```
+$ curl http://localhost:9898/metrics
+# HELP blocks_added The number of blocks added to the index
+# TYPE blocks_added gauge
+blocks_added 0
+# HELP failed_rpc_requests The number of requests made to the RPC node that have received an error response
+# TYPE failed_rpc_requests gauge
+failed_rpc_requests 0
+# HELP rpc_requests The number of requests made to the RPC node
+# TYPE rpc_requests gauge
+rpc_requests 0
+```
+
+Technically, metrics can be enable whilst using the TUI; however, one would imagine that it really only makes sense to collect metrics in order to view the state of the index.
 
