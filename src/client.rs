@@ -8,16 +8,31 @@ use std::{
 use alloy::{
     eips::BlockId,
     primitives::{ChainId, TxHash},
-    providers::{
-        IpcConnect, Provider, ProviderBuilder, RootProvider, WsConnect,
-    },
-    pubsub::{PubSubConnect, PubSubFrontend},
+    providers::{IpcConnect, Provider, ProviderBuilder, WsConnect},
+    pubsub::PubSubConnect,
     rpc::types::{Block, Header, Transaction},
 };
 use eyre::eyre;
 use futures::Stream;
 use log::{debug, info};
 use url::Url;
+
+pub type NightmareProvider = alloy::providers::fillers::FillProvider<
+    alloy::providers::fillers::JoinFill<
+        alloy::providers::Identity,
+        alloy::providers::fillers::JoinFill<
+            alloy::providers::fillers::GasFiller,
+            alloy::providers::fillers::JoinFill<
+                alloy::providers::fillers::BlobGasFiller,
+                alloy::providers::fillers::JoinFill<
+                    alloy::providers::fillers::NonceFiller,
+                    alloy::providers::fillers::ChainIdFiller,
+                >,
+            >,
+        >,
+    >,
+    alloy::providers::RootProvider,
+>;
 
 /// Interface to an Ethereum node
 pub trait Client {
@@ -68,7 +83,7 @@ impl AnyClient {
     }
 
     /// Handle to the internal Alloy provider
-    pub fn provider(&self) -> &RootProvider<PubSubFrontend> {
+    pub fn provider(&self) -> &NightmareProvider {
         match self {
             Self::Ws(t) => t.provider(),
             Self::Ipc(t) => t.provider(),
@@ -138,7 +153,7 @@ impl Client for AnyClient {
 pub struct WsClient {
     url: Url,
     chain_id: ChainId,
-    provider: Arc<RootProvider<PubSubFrontend>>,
+    provider: Arc<NightmareProvider>,
 }
 
 impl WsClient {
@@ -148,7 +163,7 @@ impl WsClient {
     pub async fn new(url: Url) -> eyre::Result<Self> {
         let provider = Arc::new(
             ProviderBuilder::new()
-                .on_ws(WsConnect::new(url.clone()))
+                .connect_ws(WsConnect::new(url.clone()))
                 .await?,
         );
         let chain_id = provider.get_chain_id().await?;
@@ -163,7 +178,7 @@ impl WsClient {
         })
     }
 
-    pub fn provider(&self) -> &RootProvider<PubSubFrontend> {
+    pub fn provider(&self) -> &NightmareProvider {
         &self.provider
     }
 }
@@ -207,11 +222,7 @@ impl Client for WsClient {
 
     async fn block(&self, id: BlockId) -> eyre::Result<Block> {
         debug!("Retrieving block {}...", id);
-        match self
-            .provider
-            .get_block(id, alloy::rpc::types::BlockTransactionsKind::Full)
-            .await?
-        {
+        match self.provider.get_block(id).full().await? {
             Some(t) => Ok(t),
             None => Err(eyre!("No block")),
         }
@@ -230,7 +241,7 @@ impl Client for WsClient {
 pub struct IpcClient {
     path: PathBuf,
     chain_id: ChainId,
-    provider: Arc<RootProvider<PubSubFrontend>>,
+    provider: Arc<NightmareProvider>,
 }
 
 impl IpcClient {
@@ -243,7 +254,7 @@ impl IpcClient {
         IpcConnect<P>: PubSubConnect,
     {
         let ipc = IpcConnect::new(path.clone());
-        let provider = Arc::new(ProviderBuilder::new().on_ipc(ipc).await?);
+        let provider = Arc::new(ProviderBuilder::new().connect_ipc(ipc).await?);
         let chain_id = provider.get_chain_id().await?;
         info!(
             "IPC client initialised (endpoint: ipc://{}, chain: {})",
@@ -258,7 +269,7 @@ impl IpcClient {
     }
 
     /// Handle to the internal Alloy provider
-    pub fn provider(&self) -> &RootProvider<PubSubFrontend> {
+    pub fn provider(&self) -> &NightmareProvider {
         &self.provider
     }
 }
@@ -302,11 +313,7 @@ impl Client for IpcClient {
 
     async fn block(&self, id: BlockId) -> eyre::Result<Block> {
         debug!("Retrieving block {}...", id);
-        match self
-            .provider
-            .get_block(id, alloy::rpc::types::BlockTransactionsKind::Full)
-            .await?
-        {
+        match self.provider.get_block(id).full().await? {
             Some(t) => Ok(t),
             None => Err(eyre!("No block")),
         }

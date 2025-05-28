@@ -3,14 +3,14 @@ use std::{iter::zip, path::PathBuf, str::FromStr, sync::Arc, time::Duration};
 
 use alloy::{
     consensus::{
-        Signed, Transaction as TraitTransaction, TxEip1559, TxEip2930,
-        TxEip4844, TxEip4844Variant, TxEnvelope, TxLegacy,
+        transaction::Recovered, Signed, Transaction as TraitTransaction,
+        TxEip1559, TxEip2930, TxEip4844, TxEip4844Variant, TxEip7702,
+        TxEnvelope, TxLegacy,
     },
     eips::{BlockId, BlockNumberOrTag},
     hex::{FromHex, FromHexError},
     primitives::{
-        Address, BlockHash, BlockNumber, Bytes, PrimitiveSignature, TxHash,
-        TxKind, U256,
+        Address, BlockHash, BlockNumber, Bytes, Signature, TxHash, TxKind, U256,
     },
     rpc::types::{eth::Header, Block, Transaction},
 };
@@ -120,10 +120,7 @@ impl Database {
         &self,
         hash: BlockHash,
     ) -> eyre::Result<Option<Header>> {
-        debug!(
-            "Block header {} requested from database...",
-            hash.to_string()
-        );
+        debug!("Block header {} requested from database...", hash);
         match self.conn_pool.get()?.query_row(
             format!("SELECT * FROM block_headers WHERE hash = '{}'", hash)
                 .as_str(),
@@ -297,7 +294,7 @@ impl Database {
     ) -> eyre::Result<()> {
         let tx_info = transaction.info();
 
-        let to = match &transaction.inner {
+        let to = match &transaction.inner.inner() {
             TxEnvelope::Legacy(t) => match t.tx().to {
                 TxKind::Create => Address::ZERO,
                 TxKind::Call(a) => a,
@@ -367,7 +364,7 @@ impl Database {
                     tx_info.block_hash.unwrap().to_string(),
                     tx_info.block_number.unwrap().to_string(),
                     tx_info.index.unwrap().to_string(),
-                    transaction.from.to_string(),
+                    transaction.inner.signer().to_string(),
                     tx_type.to_string(),
                     transaction.chain_id().unwrap_or(1),
                     transaction.nonce(),
@@ -595,7 +592,7 @@ impl Database {
 
         let tx_type = row.get::<&str, u64>("type")?;
 
-        let inner: TxEnvelope = match tx_type {
+        let envelope: TxEnvelope = match tx_type {
             0 => TxEnvelope::Legacy(Signed::new_unchecked(
                 TxLegacy {
                     chain_id: Some(chain_id),
@@ -609,7 +606,7 @@ impl Database {
                     value,
                     input,
                 },
-                PrimitiveSignature::test_signature(),
+                Signature::test_signature(),
                 hash,
             )),
             1 => TxEnvelope::Eip2930(Signed::new_unchecked(
@@ -626,7 +623,7 @@ impl Database {
                     access_list: vec![].into(), /* TODO(jmcph4): support access lists */
                     input,
                 },
-                PrimitiveSignature::test_signature(),
+                Signature::test_signature(),
                 hash,
             )),
             2 => TxEnvelope::Eip1559(Signed::new_unchecked(
@@ -646,7 +643,7 @@ impl Database {
                     access_list: vec![].into(), /* TODO(jmcph4): support access lists */
                     input,
                 },
-                PrimitiveSignature::test_signature(),
+                Signature::test_signature(),
                 hash,
             )),
             3 => TxEnvelope::Eip4844(Signed::new_unchecked(
@@ -665,19 +662,39 @@ impl Database {
                     max_fee_per_blob_gas: 0,
                     input,
                 }),
-                PrimitiveSignature::test_signature(),
+                Signature::test_signature(),
+                hash,
+            )),
+            4 => TxEnvelope::Eip7702(Signed::new_unchecked(
+                TxEip7702 {
+                    chain_id,
+                    nonce,
+                    gas_limit,
+                    max_fee_per_gas: max_fee_per_gas.into(),
+                    max_priority_fee_per_gas: max_priority_fee_per_gas
+                        .unwrap()
+                        .into(),
+                    to,
+                    value,
+                    access_list: vec![].into(), /* TODO(jmcph4): support access lists */
+                    authorization_list: vec![], /* TODO(jmcph4): support auth lists */
+                    input,
+                },
+                Signature::test_signature(),
                 hash,
             )),
             _ => return Err(eyre!("Unsupported EIP-2718 transaction type")),
         };
 
         Ok(Transaction {
-            inner,
+            inner: Recovered::new_unchecked(
+                envelope,
+                row.get::<&str, String>("from_address")?.parse()?,
+            ),
             block_hash: Some(row.get::<&str, String>("block_hash")?.parse()?),
             block_number: Some(row.get::<&str, u64>("block_number")?),
             transaction_index: Some(row.get::<&str, u64>("position")?),
             effective_gas_price: None, /* deprecated */
-            from: row.get::<&str, String>("from_address")?.parse()?,
         })
     }
 
