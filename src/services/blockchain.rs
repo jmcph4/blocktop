@@ -49,7 +49,7 @@ impl BlockchainService {
                     client: AnyClient::new(rpc).await?,
                 };
                 while let Some(header) =
-                    this.client.block_headers().await?.next().await
+                    this.client.block_headers().await.inspect_err(|e| error!("Failed to acquire block header stream from RPC: {e:?}"))?.next().await
                 {
                     metrics.rpc_requests.inc();
                     let block = this
@@ -59,7 +59,7 @@ impl BlockchainService {
                             header.hash,
                             alloy::rpc::types::BlockTransactionsKind::Full,
                         )
-                        .await?
+                        .await.inspect_err(|e| {error!("Failed to retrieve block by hash from RPC: {e:?}"); metrics.failed_rpc_requests.inc();})?
                         .ok_or(eyre!("No such block"))?;
                     db.add_block(&block).inspect_err(|e| {
                         error!("Failed to write block to database: {e:?}")
