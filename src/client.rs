@@ -7,11 +7,8 @@ use std::{
 
 use alloy::{
     eips::BlockId,
-    network::Ethereum,
     primitives::{ChainId, TxHash},
-    providers::{
-        IpcConnect, Provider, ProviderBuilder, RootProvider, WsConnect,
-    },
+    providers::{IpcConnect, Provider, ProviderBuilder, WsConnect},
     pubsub::PubSubConnect,
     rpc::types::{Block, Header, Transaction},
 };
@@ -19,6 +16,23 @@ use eyre::eyre;
 use futures::Stream;
 use log::{debug, info};
 use url::Url;
+
+pub type NightmareProvider = alloy::providers::fillers::FillProvider<
+    alloy::providers::fillers::JoinFill<
+        alloy::providers::Identity,
+        alloy::providers::fillers::JoinFill<
+            alloy::providers::fillers::GasFiller,
+            alloy::providers::fillers::JoinFill<
+                alloy::providers::fillers::BlobGasFiller,
+                alloy::providers::fillers::JoinFill<
+                    alloy::providers::fillers::NonceFiller,
+                    alloy::providers::fillers::ChainIdFiller,
+                >,
+            >,
+        >,
+    >,
+    alloy::providers::RootProvider,
+>;
 
 /// Interface to an Ethereum node
 pub trait Client {
@@ -69,7 +83,7 @@ impl AnyClient {
     }
 
     /// Handle to the internal Alloy provider
-    pub fn provider(&self) -> &RootProvider<Ethereum> {
+    pub fn provider(&self) -> &NightmareProvider {
         match self {
             Self::Ws(t) => t.provider(),
             Self::Ipc(t) => t.provider(),
@@ -139,7 +153,7 @@ impl Client for AnyClient {
 pub struct WsClient {
     url: Url,
     chain_id: ChainId,
-    provider: Arc<RootProvider<Ethereum>>,
+    provider: Arc<NightmareProvider>,
 }
 
 impl WsClient {
@@ -164,7 +178,7 @@ impl WsClient {
         })
     }
 
-    pub fn provider(&self) -> &RootProvider<Ethereum> {
+    pub fn provider(&self) -> &NightmareProvider {
         &self.provider
     }
 }
@@ -227,7 +241,7 @@ impl Client for WsClient {
 pub struct IpcClient {
     path: PathBuf,
     chain_id: ChainId,
-    provider: Arc<RootProvider<Ethereum>>,
+    provider: Arc<NightmareProvider>,
 }
 
 impl IpcClient {
@@ -255,7 +269,7 @@ impl IpcClient {
     }
 
     /// Handle to the internal Alloy provider
-    pub fn provider(&self) -> &RootProvider<Ethereum> {
+    pub fn provider(&self) -> &NightmareProvider {
         &self.provider
     }
 }
